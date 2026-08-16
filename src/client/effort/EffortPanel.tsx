@@ -23,6 +23,19 @@ interface EffortLevel {
   description?: string
 }
 
+/** 通用兜底刻度（与宿主侧 effort-core 的 universalReasoning 保持一致）。 */
+const UNIVERSAL_EFFORTS: EffortLevel[] = [
+  { id: 'off', name: 'OFF' },
+  { id: 'low', name: 'Low' },
+  { id: 'medium', name: 'Medium' },
+  { id: 'high', name: 'High' },
+  { id: 'max', name: 'Ultracode' },
+]
+
+/** 档位显示名：off → OFF、max → Ultracode，其余用目录名。 */
+const displayName = (level: EffortLevel): string =>
+  level.id === 'off' ? 'OFF' : level.id === 'max' ? 'Ultracode' : level.name
+
 /** The advisory directory value (`sessions.models` response). */
 interface DirectoryValue {
   current: { provider: string; model: string; reasoningEffort?: string } | null
@@ -85,7 +98,9 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
   const current = rawCurrent ?? fallback
   const group = current === null ? undefined : directory?.groups.find((entry) => entry.id === current.provider)
   const model = group?.models.find((entry) => entry.id === current?.model)
-  const efforts = model?.reasoning?.efforts ?? []
+  // 目录未声明 reasoning 元数据时使用通用 5 档刻度（宿主侧会为自定义模型供给）
+  const declaredEfforts = model?.reasoning?.efforts
+  const efforts = declaredEfforts !== undefined ? declaredEfforts : UNIVERSAL_EFFORTS
   const usable = !disabled && current !== null && efforts.length >= 2
 
   const currentEffortId = current?.reasoningEffort ?? model?.reasoning?.defaultEffort
@@ -177,7 +192,7 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
                 key={level.name}
                 className={`${css.status} ${css[`level${displayIndex}`] ?? ''} ${displayIndex === efforts.length - 1 ? css.statusGlow : ''}`}
               >
-                {level.name}
+                {displayName(level)}
               </span>
             ) : (
               <span className={css.status}>—</span>
@@ -195,7 +210,7 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
               className={`${css.levelLabel}${labelIndex === displayIndex ? ` ${css.levelLabelActive}` : ''}`}
               style={{ left: `${10 + (labelIndex / Math.max(efforts.length - 1, 1)) * 80}%` }}
             >
-              {labelIndex === 0 ? 'OFF' : labelIndex === efforts.length - 1 ? 'MAX' : entry.name}
+              {labelIndex === 0 ? 'OFF' : labelIndex === efforts.length - 1 ? 'MAX' : displayName(entry)}
             </span>
           ))}
         </div>
@@ -230,7 +245,7 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
         </div>
         {!usable && (
           <div className={css.emptyOverlay}>
-            {disabled ? '模型目录加载中…' : '当前模型不提供多档推理等级'}
+            {disabled ? '模型目录加载中…' : '当前模型不支持思考强度调节'}
           </div>
         )}
       </div>

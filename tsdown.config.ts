@@ -43,6 +43,9 @@ const libConfig: UserConfig = {
   fixedExtension: false,
   dts: false,
   clean: false,
+  deps: {
+    neverBundle: [/^@deepseek-ai\//],
+  },
 }
 
 /** 浏览器 half：CJS 工厂包 + 平台 externals + 内联 CSS。 */

@@ -136,9 +136,43 @@ document.body.dispatchEvent(new window.MouseEvent('click', { bubbles: true, canc
 await new Promise((resolve) => setTimeout(resolve, 30))
 assert(host.querySelector('[data-effort-panel="true"]') === null, 'panel hides on outside click')
 
-// ---- 卸载回收 ----
+// ---- 通用兜底：模型未声明 reasoning 元数据时仍可用 5 档刻度 ----
 disposer?.()
-assert(document.querySelector('[data-effort-slider-host]') === null, 'host removed by disposer')
+const apiNoReasoning = {
+  sessions: {
+    models: async () => ({
+      result: {
+        ok: true,
+        value: {
+          current: { provider: 'p2', model: 'custom-x' },
+          groups: [{ id: 'p2', models: [{ id: 'custom-x' }] }],
+        },
+      },
+    }),
+    selectModel: async () => ({ result: { ok: true } }),
+  },
+}
+let disposer2 = null
+const ctx2 = {
+  get: (name) => (name === 'sessions' ? sessions : name === 'connection' ? { api: apiNoReasoning } : undefined),
+  effect: (fn) => { disposer2 = fn() },
+}
+exportsObj.apply(ctx2)
+const host2 = document.querySelector('[data-effort-slider-host]')
+assert(host2 !== null, 'second apply attaches a fresh host')
+row.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
+await new Promise((resolve) => setTimeout(resolve, 120))
+const panel2 = host2.querySelector('[data-effort-panel="true"]')
+assert(panel2 !== null, 'panel opens for a model without reasoning metadata (universal fallback)')
+if (panel2 !== null) {
+  const text2 = panel2.textContent ?? ''
+  assert(text2.includes('OFF') && text2.includes('MAX') && text2.includes('Low') && text2.includes('Medium') && text2.includes('High'), 'universal scale OFF/Low/Medium/High/MAX rendered')
+  assert(!text2.includes('不支持思考强度调节'), 'no unavailable overlay for universal fallback')
+  const range2 = panel2.querySelector('input[type="range"]')
+  assert(range2 !== null && range2.disabled === false, 'slider enabled without declared efforts')
+}
+disposer2?.()
+assert(document.querySelector('[data-effort-slider-host]') === null, 'second host removed by disposer')
 
 console.log(failures === 0 ? 'ALL SMOKE CHECKS PASSED' : failures + ' CHECK(S) FAILED')
 process.exit(failures === 0 ? 0 : 1)

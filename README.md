@@ -14,6 +14,39 @@
 > aurora 皮肤为 BSD-3-Clause（© 2026 dsh-web-ui-custom contributors）。
 > 本插件与上游项目无隶属关系，完整声明见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
 
+## 通用思考强度（v0.2.0 新功能）
+
+**任何自定义的第三方模型/提供商都支持思考强度调节，且产生线上实际作用**：
+
+- **适配器元数据供给（宿主）**：对未声明 `reasoning` 元数据的模型自动注入通用 5 档刻度
+  （`off/low/medium/high/max` → OFF/Low/Medium/High/Ultracode），使官方模型菜单与本面板的选择器可用、请求校验通过；
+- **线级供给（宿主，pi-ai）**：自动为 `llm-pi-ai` 设置里缺少 `reasoningEfforts` 的自定义模型
+  补写 `reasoningEfforts` 字典与 `compat` 线方言（**热生效，无需重启**），由 pi-ai 按方言把档位
+  翻译成真实的线上字段（`reasoning_effort` / `thinking` / OpenRouter `reasoning.effort` 等）；
+- **客户端兜底刻度**：目录未返回 reasoning 元数据时，面板仍以通用 5 档刻度打开；
+- 用户已有的声明（`reasoningEfforts: false` 或自定义字典）一律尊重、不会被覆盖。
+
+支持的自定义端点线方言（设置 `effort-slider.defaultDialect` 或 `routes.<路由>`）：
+
+| 方言 | 线上效果 |
+| --- | --- |
+| `effort`（默认） | OpenAI 风格 `reasoning_effort: low/medium/high/max` |
+| `deepseek` | `thinking:{type}` 开关 + `reasoning_effort` |
+| `openrouter` | `reasoning: { effort }`（OpenRouter 归一） |
+| `together` / `zai` | `reasoning.enabled` / `thinking:{type}` + 可选 effort |
+| `qwen` | `enable_thinking` 开关 |
+| `string-thinking` / `ant-ling` | `thinking` / `reasoning.effort` 字符串 |
+
+配置（写入 `~/.dsh/settings.yaml` 即热生效）：
+
+```yaml
+effort-slider:
+  enabled: true          # 供给总开关
+  defaultDialect: effort # 全局默认线方言
+  routes:
+    my-gateway: deepseek # 按路由覆盖
+```
+
 ## 功能
 
 - **无极拖动**：0–100 连续拖动，实时写入 `reasoningEffort`（16ms 节流，拖动中不堆积请求）
@@ -42,8 +75,8 @@ DevTools Console 出现 `[effort-slider] intercept row: ...` 表示拦截成功�
 
 ```sh
 pnpm install
-pnpm build   # tsdown → lib/index.js（宿主半区，空操作）+ lib/client.js（浏览器半区）
-pnpm test    # jsdom 冒烟测试：拦截/渲染/吸附/回收，20 项断言
+pnpm build   # tsdown → lib/index.js（宿主半区：通用思考强度供给）+ lib/client.js（浏览器半区）
+pnpm test    # 宿主单测（方言/补丁幂等）+ jsdom 冒烟（拦截/渲染/吸附/兜底刻度/回收）
 ```
 
 浏览器半区遵循官方外部插件约定：经典脚本 + `window.__ModuleLoader__.load` 工厂；
@@ -54,7 +87,8 @@ pnpm test    # jsdom 冒烟测试：拦截/渲染/吸附/回收，20 项断言
 
 ```text
 src/
-  index.ts                  宿主半区：稳定插件名 + 空操作 apply
+  index.ts                  宿主半区：通用思考强度供给（适配器元数据包装 + pi-ai 线级供给 + 设置段）
+  effort-core.ts             纯逻辑：方言 → 线级映射、供给补丁生成（单测覆盖）
   client/
     index.ts                浏览器半区：拦截模型菜单「推理等级」行 + 面板锚点挂载
     css-modules.d.ts
@@ -65,7 +99,7 @@ src/
       effort.module.css     面板样式（lightningcss 内联注入）
 cordis.patch.yml           bundle 补丁（insert ui-effort-slider 行）
 lib/                       构建产物（client.js 附带 sourcemap）
-test/                      client.smoke.mjs 冒烟测试（node test/client.smoke.mjs）
+test/                      host.spec.mjs 宿主单测 + client.smoke.mjs 冒烟测试
 ```
 
 ## 许可证
