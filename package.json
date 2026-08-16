@@ -23,7 +23,7 @@
       "platform": "web"
     }
   },
-  "license": "Apache-2.0",
+  "license": "BSD-3-Clause",
   "files": [
     "lib",
     "cordis.patch.yml",
