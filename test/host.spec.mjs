@@ -35,9 +35,13 @@ assert(DIALECT_KEYS.length === 8, '8 dialects')
 const profile = { models: [{ id: 'm1' }, { id: 'm2', reasoningEfforts: false }, { id: 'm3', reasoningEfforts: { off: null, low: 'x' } }] }
 const ops = await buildProvisionOps('rt', profile, 'effort', (id) => id === 'm1' ? 'openai-completions' : undefined)
 const paths = ops.map((o) => o.path.join('/'))
-assert(paths.includes('providers/rt/models/0/reasoningEfforts') && paths.includes('providers/rt/models/0/compat'), 'm1 gets reasoningEfforts + compat')
-assert(!paths.some((p) => p.includes('models/1')), 'm2 (user false) skipped')
-assert(!paths.some((p) => p.includes('models/2')), 'm3 (user dict) skipped')
+assert(paths.length === 1 && paths[0] === 'providers/rt/models', 'models branch emits ONE whole-array set op (path has no array index)')
+const injected = ops[0].value
+assert(Array.isArray(injected) && injected.length === 3, 'whole-array value keeps all 3 entries')
+assert(injected[0].reasoningEfforts !== undefined && injected[0].reasoningEfforts.max === 'max', 'm1 got reasoningEfforts injected')
+assert(injected[0].compat?.supportsReasoningEffort === true, 'm1 got compat on openai-completions')
+assert(injected[1].reasoningEfforts === false, 'm2 (user false) kept untouched')
+assert(injected[2].reasoningEfforts.off === null && injected[2].reasoningEfforts.low === 'x', 'm3 (user dict) kept untouched')
 
 // ---- buildProvisionOps: catalog route via modelOverrides ----
 const ops2 = await buildProvisionOps('rt2', { modelOverrides: { a: {} } }, 'deepseek', () => 'openai-completions', ['a', 'b'], (id) => id === 'b')
@@ -53,8 +57,10 @@ assert(ops3.length === 0, 'already-provisioned entry yields no ops')
 
 // ---- dialect change rewrites our injection only ----
 const ops4 = await buildProvisionOps('rt', already, 'deepseek', () => 'openai-completions')
-assert(ops4.length === 1, 'dialect change writes one op (wire map identical, compat differs)')
-assert(ops4[0].path.at(-1) === 'compat' && ops4[0].value.thinkingFormat === 'deepseek' && ops4[0].value.supportsReasoningEffort === true, 'compat updated to deepseek')
+assert(ops4.length === 1, 'dialect change writes one whole-array op (wire map identical, compat differs)')
+assert(ops4[0].path.at(-1) === 'models', 'whole-array op targets models')
+const m1 = ops4[0].value[0]
+assert(m1.compat.thinkingFormat === 'deepseek' && m1.compat.supportsReasoningEffort === true, 'compat updated to deepseek')
 
 // ---- isOurInjection ----
 assert(isOurInjection({ off: null, low: 'low', medium: 'medium', high: 'high', max: 'max' }) === true, 'recognizes own injection')

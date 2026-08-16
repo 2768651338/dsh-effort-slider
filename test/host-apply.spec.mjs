@@ -89,13 +89,12 @@ const piAiMutations = mutations.filter((m) => m.ns === 'llm-pi-ai')
 assert(piAiMutations.length > 0, 'provision mutated llm-pi-ai after section became ready')
 if (piAiMutations.length > 0) {
   const allOps = piAiMutations.flatMap((m) => m.ops)
-  const reasonOps = allOps.filter((op) => op.path[op.path.length - 1] === 'reasoningEfforts')
-  assert(reasonOps.length === 2, 'both custom models got reasoningEfforts injected')
-  const first = reasonOps[0]
-  assert(first !== undefined && first.op === 'set' && first.value.off === null && first.value.max === 'max', 'injected reasoningEfforts maps off→null, max→max')
-  const compatOps = allOps.filter((op) => op.path[op.path.length - 1] === 'compat')
-  assert(compatOps.length === 2, 'openai-completions models got compat injected')
-  assert(compatOps[0]?.value?.supportsReasoningEffort === true, 'compat.supportsReasoningEffort true on effort dialect')
+  assert(allOps.length === 1 && allOps[0].path.join('/') === 'providers/jiyuanlvdong/models', 'provision emits ONE whole-array set op')
+  const value = allOps[0].value
+  assert(Array.isArray(value) && value.length === 2, 'whole-array value keeps both models')
+  assert(value[0].reasoningEfforts !== undefined && value[0].reasoningEfforts.off === null && value[0].reasoningEfforts.max === 'max', 'model 0 got reasoningEfforts (off→null, max→max)')
+  assert(value[1].reasoningEfforts !== undefined, 'model 1 got reasoningEfforts')
+  assert(value[0].compat?.supportsReasoningEffort === true, 'compat.supportsReasoningEffort true on effort dialect')
 }
 
 console.log(failures === 0 ? 'ALL HOST APPLY SPECS PASSED' : failures + ' CHECK(S) FAILED')

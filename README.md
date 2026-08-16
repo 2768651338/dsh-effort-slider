@@ -7,7 +7,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.2.4-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.2.5-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -24,6 +24,8 @@
 
 ---
 
+> 🔧 **v0.2.5** — 修复通用思考强度供给真正的落地 bug：显式 models 数组改为整数组替换（dsh-settings 的 path 补丁不能穿过数组中间节点，否则 models 被破坏、schema 拒绝、供给静默失败）。
+>
 > 🔧 **v0.2.4** — 修复通用思考强度供给在 pi-ai 设置段晚注册时永不落地：供给改为就绪重试（段注册晚于适配器且不触发 settings/updated），自定义模型现可稳定获得思考强度。
 >
 > 🆕 **v0.2.3** — 模型座位的入口按钮（输入框上方「模型 · 档位」）档位名也按档位着色，菜单关闭后常驻可见。

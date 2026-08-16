@@ -139,6 +139,47 @@ export function isOurInjection(reasoningEfforts: unknown): boolean {
 }
 
 /**
+ * 为显式 models 数组计算注入后的完整条目，供「整数组替换」使用。
+ * dsh-settings 的 path 补丁不能穿过数组中间节点（applyPathOp 会把数组
+ * 当作非 plain object 重建为对象、丢失其余条目），所以对 models 只能
+ * 一次性 replace 整个数组，而不是逐条写 models[i].reasoningEfforts。
+ * @returns 注入后的完整 models 数组，以及是否发生了任何变化。
+ */
+export function injectedModels(
+  profile: PiAiProfile,
+  dialect: WireDialect,
+  apiOf: (modelId: string) => string | undefined,
+): { models: Array<Record<string, unknown>>; changed: boolean } {
+  const models = profile.models ?? []
+  let changed = false
+  const next = models.map((entry) => {
+    const result: Record<string, unknown> = { ...(entry as Record<string, unknown>) }
+    // 用户显式声明（false 或自定义字典）一律尊重，原样保留。
+    if (entry.reasoningEfforts === false) return result
+    if (entry.reasoningEfforts !== undefined && !isOurInjection(entry.reasoningEfforts)) return result
+    const api = apiOf(entry.id) ?? profile.api
+    const injection = wireFor(dialect, api === 'openai-completions')
+    if (!deepEqualJson(entry.reasoningEfforts, injection.reasoningEfforts)) {
+      result.reasoningEfforts = injection.reasoningEfforts
+      changed = true
+    }
+    if (injection.compat !== undefined) {
+      const compat = (entry.compat ?? {}) as Record<string, unknown>
+      const patch: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(injection.compat)) {
+        if (compat[key] !== value) patch[key] = value
+      }
+      if (Object.keys(patch).length > 0) {
+        result.compat = { ...compat, ...patch }
+        changed = true
+      }
+    }
+    return result
+  })
+  return { models: next, changed }
+}
+
+/**
  * 为一条 route 生成供给补丁（幂等）：
  * - models 数组条目：reasoningEfforts 缺失或由我们注入（方言变更时改写）→ 按当前方言注入；
  *   用户显式声明（false 或自定义字典）→ 尊重并跳过；
@@ -180,7 +221,11 @@ export async function buildProvisionOps(
   }
   const models = profile.models
   if (models !== undefined && models.length > 0) {
-    models.forEach((entry, index) => pushFor(['providers', route, 'models', String(index)], entry))
+    // models 是数组：path 补丁穿不过数组中间节点，改为整数组替换。
+    const { models: nextModels, changed } = injectedModels(profile, dialect, apiOf)
+    if (changed) {
+      ops.push({ op: 'set', path: ['providers', route, 'models'], value: nextModels })
+    }
     return ops
   }
   // 纯目录路由：走 modelOverrides（仅目录模型可用，且需目录描述该路由）
