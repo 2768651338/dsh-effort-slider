@@ -1,0 +1,54 @@
+{
+  "name": "dsh-effort-slider",
+  "description": "仿 Claude Code 推理等级滑块（独立插件）：点击模型菜单「推理等级」弹出 Effort 滑块面板——无极拖动、松手吸附、WebGL 火焰跟随、OFF/MAX 刻度、Low/Medium/High/Ultracode 状态。从 @captain1275/dsh-web-ui-all v0.2.4 内置 aurora 皮肤剥离。",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-settings-general"
+      ],
+      "platform": "web"
+    }
+  },
+  "license": "Apache-2.0",
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsdown --config ./tsdown.config.ts",
+    "watch": "tsdown --config ./tsdown.config.ts --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node test/client.smoke.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "29.1.1",
+    "lightningcss": "^1.32.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "tsdown": "^0.22.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/2768651338/dsh-effort-slider.git"
+  },
+  "homepage": "https://github.com/2768651338/dsh-effort-slider",
+  "bugs": {
+    "url": "https://github.com/2768651338/dsh-effort-slider/issues"
+  }
+}

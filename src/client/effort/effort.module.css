@@ -1,0 +1,38 @@
+/* 仿 Claude Code 推理等级 Effort 面板样式（构建时由 lightningcss 哈希类名并内联注入）。 */
+.panel{user-select:none;z-index:10;pointer-events:auto;width:280px;position:absolute;top:0;left:0 }
+.glow{opacity:.6;filter:blur(8px);z-index:0;pointer-events:none;background:linear-gradient(135deg,#a855f74d,#3b82f626,#a855f733);border-radius:18px;position:absolute;inset:-3px }
+.inner{z-index:1;background:linear-gradient(160deg,#0e0a16 0%,#140e20 50%,#0c0818 100%);border:1px solid #a855f71f;border-radius:13px;padding:14px 16px 12px;position:relative;box-shadow:0 8px 32px #00000080,inset 0 1px #ffffff0a }
+.head{justify-content:space-between;align-items:center;margin-bottom:2px;display:flex }
+.headLeft{align-items:center;gap:7px;font-size:14px;font-weight:500;display:inline-flex;overflow:hidden }
+.labelText{color:#8880a0;letter-spacing:.03em;font-weight:600 }
+.status{color:#aaa0c0;text-transform:uppercase;will-change:transform, opacity, filter;vertical-align:middle;font-family:Georgia,Palatino Linotype,serif;font-style:italic;font-weight:700;transition:color .4s cubic-bezier(.25,.46,.45,.94),text-shadow .4s cubic-bezier(.25,.46,.45,.94);display:inline-block }
+.statusGlow{color:#c084fc;text-shadow:0 0 14px #a855f7b3 }
+.level0{color:#c882a0bf }
+.level1{color:#c8aa82bf }
+.level2{color:#82aac8bf }
+.level3{color:#c084fcf2;text-shadow:0 0 10px #a855f7b3 }
+.level4{color:#d8b4fe;text-shadow:0 0 12px #a855f7 }
+.close{color:#8880a0;cursor:pointer;background:#a855f714;border:1px solid #a855f72e;border-radius:7px;justify-content:center;align-items:center;width:24px;height:24px;font-size:13px;line-height:1;display:inline-flex }
+.close:hover{color:#e8e0f0;background:#a855f729;border-color:#a855f766 }
+.levelLabels{height:15px;margin-bottom:4px;position:relative }
+.levelLabel{color:#6a6080;letter-spacing:.04em;text-transform:uppercase;font-size:10px;font-weight:700;transition:color .15s;position:absolute;top:0;transform:translate(-50%) }
+.levelLabelActive{color:#c084fc }
+.trackWrapper{isolation:isolate;background:#08050e;border:1px solid #a855f714;border-radius:8px;height:32px;position:relative;overflow:hidden }
+.trackBg{z-index:0;background:linear-gradient(135deg,#0c0518,#06030c);position:absolute;inset:0 }
+.dotsLayer{pointer-events:none;z-index:1;position:absolute;inset:0 }
+.dot{background:#a855f740;border-radius:50%;width:4px;height:4px;transition:background .15s,box-shadow .15s;position:absolute;top:50%;transform:translateY(-50%) }
+.dotActive{background:#c084fc;box-shadow:0 0 8px #a855f7e6 }
+.fire{pointer-events:none;mix-blend-mode:screen;z-index:2;width:100%;height:100%;position:absolute;inset:0 }
+.range{-webkit-appearance:none;appearance:none;cursor:pointer;z-index:5;background:0 0;outline:none;width:100%;height:100%;margin:0;padding:0;position:absolute;inset:0 }
+.range::-webkit-slider-thumb{-webkit-appearance:none;cursor:grab;background:linear-gradient(145deg,#e8e0f0 0%,#c8b8e0 50%,#b8a8d8 100%);border:none;border-radius:8px;width:28px;height:28px;transition:box-shadow .5s cubic-bezier(.25,.46,.45,.94),transform .35s cubic-bezier(.34,1.56,.64,1);box-shadow:0 2px 8px #0006,0 0 0 1px #a855f726,inset 0 1px #ffffff80 }
+.range::-webkit-slider-thumb:active{cursor:grabbing;transform:scale(.92);box-shadow:0 1px 4px #00000080,0 0 0 1px #a855f740 }
+.rangeGlow::-webkit-slider-thumb{box-shadow:0 2px 8px #0006,0 0 0 1px #a855f74d,0 0 20px #a855f759,0 0 40px #a855f726,inset 0 1px #ffffff80 }
+.rangeGlow::-webkit-slider-thumb:active{box-shadow:0 1px 4px #00000080,0 0 0 1px #a855f766,0 0 24px #a855f766,0 0 48px #a855f733 }
+.range::-moz-range-thumb{cursor:grab;background:linear-gradient(145deg,#e8e0f0 0%,#c8b8e0 50%,#b8a8d8 100%);border:none;border-radius:7px;width:26px;height:26px;box-shadow:0 2px 8px #0006,0 0 0 1px #a855f726 }
+.range::-moz-range-thumb:active{cursor:grabbing;transform:scale(.95) }
+.range::-moz-range-track{background:0 0;border:none;height:32px }
+.pointLight{pointer-events:none;z-index:3;opacity:0;background:radial-gradient(circle,#a855f733 0%,#a855f70f 30%,#a855f704 55%,#0000 70%);border-radius:50%;width:150px;height:150px;transition:opacity .25s cubic-bezier(.25,.46,.45,.94);position:absolute;transform:translate(-50%,-50%) }
+.pointLightOn{opacity:1 }
+.emptyOverlay{color:#6a6080;letter-spacing:.02em;text-align:center;padding:10px 0 2px;font-size:13px;font-weight:600 }
+.statusEnterActive{transition:all .4s cubic-bezier(.25,.46,.45,.94) }
+.statusEnterFrom{opacity:0;filter:blur(10px);transform:translateY(8px) }
