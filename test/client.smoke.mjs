@@ -92,7 +92,7 @@ const ctx = {
 exportsObj.apply(ctx)
 const host = document.querySelector('[data-effort-slider-host]')
 assert(host !== null, 'host anchor div attached')
-const row = document.querySelector('#menu button')
+let row = document.querySelector('#menu button')
 
 // ---- 点击「推理等级」行 ----
 row.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
@@ -101,7 +101,7 @@ await new Promise((resolve) => setTimeout(resolve, 120))
 const panel = host.querySelector('[data-effort-panel="true"]')
 assert(panel !== null, 'panel rendered after intercept click')
 const rowSpans = row.querySelectorAll('span')
-const valueSpan = rowSpans[1]
+const valueSpanRef = { current: rowSpans[1] }
 if (panel !== null) {
   assert((panel.textContent ?? '').includes('Effort'), 'panel shows Effort label')
   assert((panel.textContent ?? '').includes('Ultracode'), 'status shows current effort Ultracode')
@@ -111,9 +111,9 @@ if (panel !== null) {
   const range = panel.querySelector('input[type="range"]')
   assert(range !== null && range.min === '0' && range.max === '100' && range.step === '1' && range.disabled === false, 'slider enabled 0..100 step 1')
   assert(panel.querySelector('canvas') !== null, 'fire canvas mounted')
-  assert(rowSpans.length === 2 && valueSpan !== undefined && (valueSpan.textContent ?? '').trim() === 'High', 'menu row has label+value spans')
-  assert(valueSpan?.style.color === 'rgb(216, 180, 254)', 'menu row value painted for ultra (max alias color)')
-  assert(valueSpan?.style.textShadow === '0 0 12px #a855f7', 'ultra glow applied to menu row')
+  assert(rowSpans.length === 2 && valueSpanRef.current !== undefined && (valueSpanRef.current.textContent ?? '').trim() === 'High', 'menu row has label+value spans')
+  assert(valueSpanRef.current?.style.color === 'rgb(216, 180, 254)', 'menu row value painted for ultra (max alias color)')
+  assert(valueSpanRef.current?.style.textShadow === '0 0 12px #a855f7', 'ultra glow applied to menu row')
 
   // ---- 无极拖动 + 松手吸附 ----
   if (range !== null) {
@@ -124,8 +124,8 @@ if (panel !== null) {
     await new Promise((resolve) => setTimeout(resolve, 60))
     const statusText = panel.querySelector('span')?.textContent ?? ''
     assert((panel.textContent ?? '').includes('High') && !(panel.textContent ?? '').includes('Ultracode'), 'released at 52% snaps to nearest level (High, not Ultra)')
-    assert(valueSpan?.style.color === 'rgb(192, 132, 252)', 'menu row repainted for high after drag')
-    assert(valueSpan?.style.textShadow === '0 0 10px #a855f7b3', 'high glow applied to menu row')
+    assert(valueSpanRef.current?.style.color === 'rgb(192, 132, 252)', 'menu row repainted for high after drag')
+    assert(valueSpanRef.current?.style.textShadow === '0 0 10px #a855f7b3', 'high glow applied to menu row')
   }
 }
 
@@ -137,11 +137,27 @@ await new Promise((resolve) => setTimeout(resolve, 30))
 assert(host.querySelector('[data-effort-panel="true"]') === null, 'panel unmounted after close')
 
 // ---- 面板关闭后：官方重渲染替换档位文本，observer 重新涂色 ----
-if (typeof window.MutationObserver !== 'undefined' && valueSpan !== undefined) {
-  valueSpan.textContent = 'Ultracode'
+if (typeof window.MutationObserver !== 'undefined' && valueSpanRef.current !== undefined) {
+  valueSpanRef.current.textContent = 'Ultracode'
   await new Promise((resolve) => setTimeout(resolve, 80))
-  assert(valueSpan.style.color === 'rgb(192, 132, 252)', 'observer repaints menu row after text replace (keeps last high)')
-  assert(valueSpan.textContent === 'Ultracode', 'observer does not clobber official text')
+  assert(valueSpanRef.current.style.color === 'rgb(192, 132, 252)', 'observer repaints menu row after text replace (keeps last high)')
+  assert(valueSpanRef.current.textContent === 'Ultracode', 'observer does not clobber official text')
+}
+
+// ---- 面板关闭后：官方菜单整体重挂载（新子树一次挂载），observer 必须给新行涂色 ----
+if (typeof window.MutationObserver !== 'undefined') {
+  // 移除整个旧菜单容器，挂载一棵全新菜单子树（模拟官方 React 原子提交重开菜单）
+  const menu = document.querySelector('#menu')
+  const fresh = document.createElement('div')
+  fresh.id = 'menu'
+  fresh.innerHTML = '<button role="menuitem"><span>推理等级</span><span>Ultracode</span></button>'
+  menu.replaceWith(fresh)
+  await new Promise((resolve) => setTimeout(resolve, 80))
+  const freshValue = fresh.querySelectorAll('span')[1]
+  assert(freshValue?.style.color === 'rgb(192, 132, 252)', 'observer repaints newly mounted menu subtree (whole-menu remount)')
+  // 后续场景改用重挂载后的新行（旧引用已 detached）
+  row = fresh.querySelector('button')
+  valueSpanRef.current = freshValue
 }
 
 // ---- 面板外点击收起 ----

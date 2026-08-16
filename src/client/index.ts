@@ -9,7 +9,7 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client
 import { createRoot, type Root } from 'react-dom/client'
 import { createElement } from 'react'
 import { EffortPanel } from './effort/EffortPanel.tsx'
-import { effortColorFor } from './effort/effortColors.ts'
+import { effortColorFor, effortColorFromLabel } from './effort/effortColors.ts'
 
 /** 档位颜色解析（客户端产物导出，供测试/复用）。 */
 export { effortColorFor }
@@ -22,24 +22,30 @@ const PANEL_W = 280
 const PANEL_H = 150
 
 /**
- * 面板/菜单行的运行时状态。
+ * 最近一次面板设置的档位（面板关闭后仍用于给菜单行着色）。
  * 用对象属性而非模块级 let：某些 bundler 会把「let x = null」+「if (x !== null)」
  * 误判为恒假分支并整体删除；对象属性写入无法静态折叠，不会被误删。
  */
-const uiState: { lastEffortId: string | null; activeRow: HTMLElement | null } = {
-  lastEffortId: null,
-  activeRow: null,
-}
+const uiState: { lastEffortId: string | null } = { lastEffortId: null }
+
+/** 官方菜单行的 label 文本（中/英两套语言包）。 */
+const EFFORT_LABEL_TEXTS = new Set(['推理等级', 'Effort'])
 
 /**
- * 官方菜单行的档位值 span：行内除了 label（「推理等级」/「Effort」）
- * 与 chevron svg 外，剩下的文本 span 就是当前档位值。
+ * 官方菜单行的档位值 span：行内除了 label 与 chevron svg 外，
+ * 剩下的文本 span 就是当前档位值（label 的相邻 span 优先）。
  */
 function effortValueSpan(row: HTMLElement): HTMLElement | null {
-  const labelTexts = new Set(['推理等级', 'Effort'])
-  for (const span of Array.from(row.querySelectorAll('span'))) {
+  const spans = Array.from(row.querySelectorAll('span'))
+  const labelIndex = spans.findIndex((span) => EFFORT_LABEL_TEXTS.has((span.textContent ?? '').trim()))
+  if (labelIndex >= 0) {
+    // 官方结构 label span 紧邻 value span。
+    const next = spans[labelIndex + 1]
+    if (next !== undefined && !EFFORT_LABEL_TEXTS.has((next.textContent ?? '').trim())) return next
+  }
+  for (const span of spans) {
     const text = (span.textContent ?? '').trim()
-    if (text.length > 0 && !labelTexts.has(text)) return span
+    if (text.length > 0 && !EFFORT_LABEL_TEXTS.has(text)) return span
   }
   return null
 }
@@ -51,6 +57,42 @@ function paintEffortRow(row: HTMLElement, effortId: string): void {
   const tone = effortColorFor(effortId)
   value.style.color = tone.color
   value.style.textShadow = tone.glow ?? 'none'
+  console.log('[effort-slider] paint:', JSON.stringify((value.textContent ?? '').trim()), '→', tone.color, row.isConnected ? '' : '(detached)')
+}
+
+/**
+ * 全量扫描文档里的「推理等级」菜单行并涂色。
+ * 不依赖任何单节点引用或 mutation 粒度：官方重开菜单（整树原子挂载）、
+ * 复用节点改文本、字符数据原地更新，都会在下一次扫描时被覆盖。
+ */
+function paintAllEffortRows(): void {
+  for (const row of Array.from(document.querySelectorAll('button[role="menuitem"]'))) {
+    const text = (row.textContent ?? '').trim()
+    if (!(text.startsWith('推理等级') || text.startsWith('Effort'))) continue
+    const value = effortValueSpan(row)
+    // 优先用面板上报的档位；没有时从档位文本反推颜色。
+    if (uiState.lastEffortId !== null) paintEffortRow(row, uiState.lastEffortId)
+    else if (value !== null) {
+      const inferred = effortColorFromLabel((value.textContent ?? '').trim())
+      if (inferred !== null) {
+        value.style.color = inferred.color
+        value.style.textShadow = inferred.glow ?? 'none'
+      }
+    }
+  }
+}
+
+/** rAF 节流：observer 高频触发时合并为一次扫描。 */
+let paintQueued = false
+const schedulePaintAll = (): void => {
+  if (paintQueued) return
+  paintQueued = true
+  const run = (): void => {
+    paintQueued = false
+    paintAllEffortRows()
+  }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run)
+  else setTimeout(run, 16)
 }
 
 /**
@@ -70,6 +112,8 @@ export function apply(ctx: ClientContext): void {
   const hidePanel = (): void => {
     root?.unmount()
     root = null
+    // 面板关闭后补涂一次：操作期间官方可能已重渲染菜单行。
+    schedulePaintAll()
   }
 
   const showPanel = (sessionId: string, anchor: HTMLElement): void => {
@@ -94,33 +138,20 @@ export function apply(ctx: ClientContext): void {
   /** 面板档位变化：记住当前档位，并给仍开着的菜单行即时涂色。 */
   const onEffortChange = (effortId: string): void => {
     uiState.lastEffortId = effortId
-    if (uiState.activeRow !== null && uiState.activeRow.isConnected) paintEffortRow(uiState.activeRow, effortId)
+    paintAllEffortRows()
   }
 
   // 官方菜单每次打开都会重新挂载行、档位文本变化会替换文本节点；
   // MutationObserver 守护这些重渲染，保证颜色在面板关闭后依然生效。
+  // 官方菜单每次打开都会重新挂载（常常整树原子提交）、档位文本变化会替换或
+  // 原地更新文本节点；任何 DOM 变化都触发一次节流全量扫描，保证颜色在面板
+  // 关闭后依然生效，且不依赖 mutation 的具体粒度。
   const paintObserver = typeof MutationObserver === 'undefined'
     ? null
-    : new MutationObserver((records) => {
-        const targets: HTMLElement[] = []
-        for (const record of records) {
-          for (const node of record.addedNodes) {
-            const el = node instanceof HTMLElement
-              ? node
-              : (node.parentNode instanceof HTMLElement ? node.parentNode : null)
-            const row = el?.closest?.('button[role="menuitem"]')
-            if (row instanceof HTMLElement) targets.push(row)
-          }
-        }
-        if (uiState.lastEffortId === null) return
-        for (const row of targets) {
-          const text = (row.textContent ?? '').trim()
-          if (row.isConnected && (text.startsWith('推理等级') || text.startsWith('Effort'))) {
-            paintEffortRow(row, uiState.lastEffortId)
-          }
-        }
-      })
-  if (paintObserver !== null) paintObserver.observe(document.body, { childList: true, subtree: true })
+    : new MutationObserver(() => schedulePaintAll())
+  if (paintObserver !== null) {
+    paintObserver.observe(document.body, { childList: true, subtree: true, characterData: true })
+  }
 
   const onDocClick = (event: MouseEvent): void => {
     const target = event.target as HTMLElement
@@ -134,8 +165,7 @@ export function apply(ctx: ClientContext): void {
         console.log('[effort-slider] intercept row:', JSON.stringify(text))
         event.preventDefault()
         event.stopPropagation()
-        uiState.activeRow = row
-        if (uiState.lastEffortId !== null) paintEffortRow(row, uiState.lastEffortId)
+        paintAllEffortRows()
         const current = (ctx.get('sessions') as { list: { getSnapshot(): { current?: string } } }).list.getSnapshot().current
         console.log('[effort-slider] session:', current)
         if (current !== undefined) showPanel(current, row)
@@ -151,7 +181,6 @@ export function apply(ctx: ClientContext): void {
     () => () => {
       document.removeEventListener('click', onDocClick, true)
       paintObserver?.disconnect()
-      uiState.activeRow = null
       uiState.lastEffortId = null
       hidePanel()
       host.remove()

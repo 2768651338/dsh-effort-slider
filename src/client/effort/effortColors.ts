@@ -31,3 +31,17 @@ const UNKNOWN: EffortColor = { color: '#c084fc' }
 /** 解析档位颜色：id（或别名）→ 色值；未知档位返回高亮紫。 */
 export const effortColorFor = (effortId: string): EffortColor =>
   EFFORT_COLORS[ALIASES[effortId] ?? effortId] ?? UNKNOWN
+
+/** 档位显示名 → 颜色推断（面板尚未上报档位 id 时，从官方菜单行的档位文本反查）。 */
+const LABEL_ALIASES: Record<string, string> = {
+  off: 'off', low: 'low', medium: 'medium', med: 'medium', high: 'high',
+  max: 'max', ultra: 'max', xhigh: 'max', ultracode: 'max', maximum: 'max',
+}
+
+/** 由显示名推断档位颜色；无法识别时返回 null（保持官方原色）。 */
+export const effortColorFromLabel = (label: string): EffortColor | null => {
+  const key = label.trim().toLowerCase()
+  const id = LABEL_ALIASES[key]
+  if (id === undefined) return null
+  return EFFORT_COLORS[id]
+}

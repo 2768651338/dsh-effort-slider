@@ -7,7 +7,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.2.1-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.2.2-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -24,7 +24,9 @@
 
 ---
 
-> 🆕 **v0.2.1** — 面板关闭后，模型菜单「推理等级」行上的档位值沿用档位色（OFF 粉灰 / Low 橙金 / Medium 蓝 / High 紫 / Ultracode 亮紫辉光），官方重渲染自动重新涂色。
+> 🔧 **v0.2.2** — 修复菜单行着色在官方菜单重开（整树重挂载）时失效：涂色改为全量扫描 + 任意 DOM 变化节流重涂，面板未上报档位时从档位文本反推颜色。
+>
+> 🆕 **v0.2.1** — 面板关闭后，模型菜单「推理等级」行上的档位值沿用档位色（OFF 粉灰 / Low 橙金 / Medium 蓝 / High 紫 / Ultracode 亮紫辉光）。
 >
 > ✨ **v0.2.0** — 任何自定义第三方模型/提供商都支持思考强度调节，且线上真实生效（适配器元数据供给 + pi-ai 线级供给，热生效）。
 >
