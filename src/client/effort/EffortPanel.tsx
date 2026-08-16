@@ -14,6 +14,8 @@ export interface EffortPanelProps {
   sessionId: string
   connection: ConnectionHandle
   onClose: () => void
+  /** 档位变化回调：面板外层用它给模型菜单行的档位文字着色。 */
+  onEffortChange?: (effortId: string) => void
 }
 
 /** One reasoning level as returned by the directory API. */
@@ -83,7 +85,7 @@ function useDirectory(connection: ConnectionHandle, sessionId: string): Director
  * @param props - session + wire face + close verb.
  */
 export function EffortPanel(props: EffortPanelProps): ReactElement {
-  const { sessionId, connection, onClose } = props
+  const { sessionId, connection, onClose, onEffortChange } = props
   const directory = useDirectory(connection, sessionId)
   const [dragging, setDragging] = useState(false)
   // Continuous 0..100 slider position; snaps to an effort level on release.
@@ -111,6 +113,8 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
   useEffect(() => {
     setRawValue(initialRaw)
     setDragging(false)
+    // 目录就绪后把当前档位上报给外层（供菜单行着色）。
+    if (usable && currentEffortId !== undefined) onEffortChange?.(currentEffortId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [directory])
 
@@ -145,6 +149,7 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
     const idx = Math.round(v / step100)
     const effort = efforts[idx]
     if (effort === undefined) return
+    onEffortChange?.(effort.id)
     void connection.api.sessions
       .selectModel({
         sessionId,

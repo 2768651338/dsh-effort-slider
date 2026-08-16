@@ -17,7 +17,7 @@ function assert(cond, msg) {
   else console.log('ok:', msg)
 }
 
-const dom = new JSDOM('<!doctype html><html><body><div id="menu"><button role="menuitem">推理等级 · High</button></div></body></html>', {
+const dom = new JSDOM('<!doctype html><html><body><div id="menu"><button role="menuitem"><span>推理等级</span><span>High</span></button></div></body></html>', {
   pretendToBeVisual: true,
 })
 const { window } = dom
@@ -28,6 +28,7 @@ globalThis.HTMLInputElement = window.HTMLInputElement
 globalThis.MouseEvent = window.MouseEvent
 globalThis.Event = window.Event
 globalThis.ResizeObserver = class { observe() {} disconnect() {} }
+if (typeof window.MutationObserver !== 'undefined') globalThis.MutationObserver = window.MutationObserver
 globalThis.requestAnimationFrame = (cb) => window.setTimeout(() => cb(performance.now()), 16)
 globalThis.cancelAnimationFrame = (id) => window.clearTimeout(id)
 
@@ -99,6 +100,8 @@ await new Promise((resolve) => setTimeout(resolve, 120))
 
 const panel = host.querySelector('[data-effort-panel="true"]')
 assert(panel !== null, 'panel rendered after intercept click')
+const rowSpans = row.querySelectorAll('span')
+const valueSpan = rowSpans[1]
 if (panel !== null) {
   assert((panel.textContent ?? '').includes('Effort'), 'panel shows Effort label')
   assert((panel.textContent ?? '').includes('Ultracode'), 'status shows current effort Ultracode')
@@ -108,6 +111,9 @@ if (panel !== null) {
   const range = panel.querySelector('input[type="range"]')
   assert(range !== null && range.min === '0' && range.max === '100' && range.step === '1' && range.disabled === false, 'slider enabled 0..100 step 1')
   assert(panel.querySelector('canvas') !== null, 'fire canvas mounted')
+  assert(rowSpans.length === 2 && valueSpan !== undefined && (valueSpan.textContent ?? '').trim() === 'High', 'menu row has label+value spans')
+  assert(valueSpan?.style.color === 'rgb(216, 180, 254)', 'menu row value painted for ultra (max alias color)')
+  assert(valueSpan?.style.textShadow === '0 0 12px #a855f7', 'ultra glow applied to menu row')
 
   // ---- 无极拖动 + 松手吸附 ----
   if (range !== null) {
@@ -118,6 +124,8 @@ if (panel !== null) {
     await new Promise((resolve) => setTimeout(resolve, 60))
     const statusText = panel.querySelector('span')?.textContent ?? ''
     assert((panel.textContent ?? '').includes('High') && !(panel.textContent ?? '').includes('Ultracode'), 'released at 52% snaps to nearest level (High, not Ultra)')
+    assert(valueSpan?.style.color === 'rgb(192, 132, 252)', 'menu row repainted for high after drag')
+    assert(valueSpan?.style.textShadow === '0 0 10px #a855f7b3', 'high glow applied to menu row')
   }
 }
 
@@ -127,6 +135,14 @@ assert(closeBtn !== null, 'close button with aria-label 关闭')
 closeBtn?.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
 await new Promise((resolve) => setTimeout(resolve, 30))
 assert(host.querySelector('[data-effort-panel="true"]') === null, 'panel unmounted after close')
+
+// ---- 面板关闭后：官方重渲染替换档位文本，observer 重新涂色 ----
+if (typeof window.MutationObserver !== 'undefined' && valueSpan !== undefined) {
+  valueSpan.textContent = 'Ultracode'
+  await new Promise((resolve) => setTimeout(resolve, 80))
+  assert(valueSpan.style.color === 'rgb(192, 132, 252)', 'observer repaints menu row after text replace (keeps last high)')
+  assert(valueSpan.textContent === 'Ultracode', 'observer does not clobber official text')
+}
 
 // ---- 面板外点击收起 ----
 row.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
