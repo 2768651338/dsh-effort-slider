@@ -1,20 +1,20 @@
 # 第三方声明 / Third-Party Notices
 
-## 上游项目（原作者）
+## 上游与第三方组件
 
-本插件（dsh-effort-slider）的全部功能代码剥离自：
+本插件的界面实现参考了以下社区组件：
 
 | 项目 | 地址 | 许可证 |
 | --- | --- | --- |
-| **dsh-ui-web**（原作者） | https://github.com/CAPTAIN1275/dsh-ui-web | Apache-2.0（仓库根） |
+| **dsh-ui-web**（上游） | https://github.com/CAPTAIN1275/dsh-ui-web | Apache-2.0（仓库根） |
 | `@captain1275/dsh-web-ui-all` v0.2.4（聚合插件） | 同上仓库 | Apache-2.0 |
 | `@captain1275/dsh-client-ui-skin-aurora` v0.2.4（功能实际所在包） | `packages/skins/aurora` | BSD-3-Clause |
 
-剥离范围：aurora 皮肤中的「仿 Claude Code 推理等级 Effort 滑块」——
+参考范围：aurora 皮肤中的「仿 Claude Code 推理等级 Effort 滑块」——
 `src/client/effort/`（EffortPanel / useWebglFire / shaders / effort.module.css）
 以及 `src/client/index.ts` 中对官方模型菜单「推理等级」行的捕获拦截逻辑。
 
-本插件为独立剥离包，与原项目无隶属关系（non-affiliation）。
+本插件为独立项目，与原项目无隶属关系（non-affiliation）。
 
 ## 许可证原文
 

@@ -1,6 +1,5 @@
 /**
  * dsh-effort-slider 浏览器半区 —— 仿 Claude Code 推理等级滑块。
- * 从 @captain1275/dsh-web-ui-all v0.2.4 内置 aurora 皮肤中剥离：
  * 点击官方模型菜单里的「推理等级」行时，拦截官方档位列表，
  * 改为弹出 Effort 滑块面板（只写 reasoningEffort，不动模型选择）。
  * 所有写入由 ctx.effect 的 disposer 在卸载时回收。

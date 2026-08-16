@@ -1,5 +1,4 @@
 # dsh-effort-slider：仿 Claude Code 推理等级滑块（独立插件）。
-# 从 @captain1275/dsh-web-ui-all v0.2.4 内置的 aurora 皮肤中剥离：
 # 点击模型菜单「推理等级」弹出 Effort 滑块面板（无极拖动 + 松手吸附 + WebGL 火焰）。
 - insert:
     - id: ui-effort-slider
