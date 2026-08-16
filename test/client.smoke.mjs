@@ -17,7 +17,7 @@ function assert(cond, msg) {
   else console.log('ok:', msg)
 }
 
-const dom = new JSDOM('<!doctype html><html><body><div id="menu"><button role="menuitem"><span>推理等级</span><span>High</span></button></div></body></html>', {
+const dom = new JSDOM('<!doctype html><html><body><div id="menu"><button role="menuitem"><span>推理等级</span><span>High</span></button></div><button aria-haspopup="menu" aria-label="选择模型，当前 m，推理等级 High"><span>m</span><span>High</span></button></body></html>', {
   pretendToBeVisual: true,
 })
 const { window } = dom
@@ -102,6 +102,8 @@ const panel = host.querySelector('[data-effort-panel="true"]')
 assert(panel !== null, 'panel rendered after intercept click')
 const rowSpans = row.querySelectorAll('span')
 const valueSpanRef = { current: rowSpans[1] }
+const trigger = document.querySelector('button[aria-haspopup="menu"]')
+const triggerEffort = trigger?.querySelectorAll('span')[1]
 if (panel !== null) {
   assert((panel.textContent ?? '').includes('Effort'), 'panel shows Effort label')
   assert((panel.textContent ?? '').includes('Ultracode'), 'status shows current effort Ultracode')
@@ -114,6 +116,8 @@ if (panel !== null) {
   assert(rowSpans.length === 2 && valueSpanRef.current !== undefined && (valueSpanRef.current.textContent ?? '').trim() === 'High', 'menu row has label+value spans')
   assert(valueSpanRef.current?.style.color === 'rgb(216, 180, 254)', 'menu row value painted for ultra (max alias color)')
   assert(valueSpanRef.current?.style.textShadow === '0 0 12px #a855f7', 'ultra glow applied to menu row')
+  assert(triggerEffort?.style.color === 'rgb(216, 180, 254)', 'model-seat trigger effort painted for ultra')
+  assert(triggerEffort?.style.textShadow === '0 0 12px #a855f7', 'ultra glow applied to trigger')
 
   // ---- 无极拖动 + 松手吸附 ----
   if (range !== null) {
@@ -126,6 +130,7 @@ if (panel !== null) {
     assert((panel.textContent ?? '').includes('High') && !(panel.textContent ?? '').includes('Ultracode'), 'released at 52% snaps to nearest level (High, not Ultra)')
     assert(valueSpanRef.current?.style.color === 'rgb(192, 132, 252)', 'menu row repainted for high after drag')
     assert(valueSpanRef.current?.style.textShadow === '0 0 10px #a855f7b3', 'high glow applied to menu row')
+    assert(triggerEffort?.style.color === 'rgb(192, 132, 252)', 'trigger repainted for high after drag')
   }
 }
 
@@ -155,6 +160,9 @@ if (typeof window.MutationObserver !== 'undefined') {
   await new Promise((resolve) => setTimeout(resolve, 80))
   const freshValue = fresh.querySelectorAll('span')[1]
   assert(freshValue?.style.color === 'rgb(192, 132, 252)', 'observer repaints newly mounted menu subtree (whole-menu remount)')
+  triggerEffort.textContent = 'Ultracode'
+  await new Promise((resolve) => setTimeout(resolve, 80))
+  assert(triggerEffort.style.color === 'rgb(192, 132, 252)', 'trigger keeps color after official text replace (last high)')
   // 后续场景改用重挂载后的新行（旧引用已 detached）
   row = fresh.querySelector('button')
   valueSpanRef.current = freshValue

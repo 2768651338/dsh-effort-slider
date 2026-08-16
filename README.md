@@ -7,7 +7,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.2.2-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.2.3-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -24,6 +24,8 @@
 
 ---
 
+> 🆕 **v0.2.3** — 模型座位的入口按钮（输入框上方「模型 · 档位」）档位名也按档位着色，菜单关闭后常驻可见。
+>
 > 🔧 **v0.2.2** — 修复菜单行着色在官方菜单重开（整树重挂载）时失效：涂色改为全量扫描 + 任意 DOM 变化节流重涂，面板未上报档位时从档位文本反推颜色。
 >
 > 🆕 **v0.2.1** — 面板关闭后，模型菜单「推理等级」行上的档位值沿用档位色（OFF 粉灰 / Low 橙金 / Medium 蓝 / High 紫 / Ultracode 亮紫辉光）。
@@ -42,7 +44,7 @@
 | 🎯 松手吸附 | 松开/失焦/键盘结束时吸附到最近档位，并补发一次确认写入 |
 | 🔥 WebGL 火焰跟随 | 三通道着色器（点火 → 模糊 → 合成），火焰前沿以弹簧阻尼跟随滑块 |
 | 🏁 OFF/MAX 刻度 | 首尾档位固定显示 `OFF` / `MAX`，中间档位显示 API 返回名 |
-| 🎨 档位状态 | 档位名实时显示在面板头部并随档位切换颜色/辉光；关闭面板后菜单行同色保持（v0.2.1） |
+| 🎨 档位状态 | 档位名实时显示在面板头部并随档位切换颜色/辉光；关闭面板后菜单行与模型座位入口按钮（「模型 · 档位」）同色保持（v0.2.3） |
 | 🌐 通用思考强度 | 未声明 `reasoning` 元数据的第三方模型自动获得通用 5 档刻度；pi-ai 模型自动补写线级字典，**热生效**（v0.2.0） |
 
 只写 `reasoningEffort`，不动模型选择；无多档推理等级的模型显示「当前模型不提供多档推理等级」。

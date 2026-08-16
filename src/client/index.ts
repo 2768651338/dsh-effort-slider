@@ -80,6 +80,34 @@ function paintAllEffortRows(): void {
       }
     }
   }
+  paintTriggerEffort()
+}
+
+/**
+ * 模型菜单的入口触发按钮（输入框上方的模型座位，aria-haspopup="menu"）：
+ * 官方在第一个 span 显示模型名、第二个 span 显示当前档位名。
+ * 这里给档位名涂上与菜单行一致的颜色（菜单关闭后触发按钮常驻可见）。
+ */
+function paintTriggerEffort(): void {
+  for (const trigger of Array.from(document.querySelectorAll('button[aria-haspopup="menu"]'))) {
+    const aria = trigger.getAttribute('aria-label') ?? ''
+    // 只有显示档位的触发器才带「推理等级 / reasoning effort」的可访问标签。
+    if (!(aria.includes('推理等级') || aria.includes('reasoning effort'))) continue
+    const spans = Array.from(trigger.querySelectorAll('span'))
+    const value = spans[1]
+    if (value === undefined) continue
+    if (uiState.lastEffortId !== null) {
+      const tone = effortColorFor(uiState.lastEffortId)
+      value.style.color = tone.color
+      value.style.textShadow = tone.glow ?? 'none'
+      continue
+    }
+    const inferred = effortColorFromLabel((value.textContent ?? '').trim())
+    if (inferred !== null) {
+      value.style.color = inferred.color
+      value.style.textShadow = inferred.glow ?? 'none'
+    }
+  }
 }
 
 /** rAF 节流：observer 高频触发时合并为一次扫描。 */
