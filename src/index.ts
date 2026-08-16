@@ -78,6 +78,15 @@ export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void 
     return
   }
 
+  // pi-ai 的 settings 段注册晚于其 adapter（installSettingsSection 在
+  // registerAdapter 之后，且 register 不触发 settings/updated），所以
+  // adapters-updated 事件先到时 settings.get('llm-pi-ai') 仍为 undefined。
+  // 这里在段尚未就绪时做有上限的延迟重试，避免供给空跑后永不再触发。
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+  let retryCount = 0
+  const RETRY_MAX = 60 // 500ms × 60 = 30s 上限
+  const piAiReady = (): boolean => settings.get(PI_AI_NS) !== undefined
+
   // ---- 1. 元数据供给：包装未声明 reasoning 的适配器模型 ----
   const wrapped = new WeakSet<AdapterLike>()
   const piAiRoutes = (): Set<string> => {
@@ -95,7 +104,28 @@ export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void 
       return info
     }
   }
+  const scheduleRetry = (): void => {
+    if (retryTimer !== null || retryCount >= RETRY_MAX) return
+    retryTimer = setTimeout(() => {
+      retryTimer = null
+      retryCount += 1
+      if (piAiReady()) {
+        retryCount = 0
+        wrapAdapters()
+        void provision()
+        return
+      }
+      scheduleRetry()
+    }, 500)
+  }
+
   const wrapAdapters = (): void => {
+    if (!piAiReady()) {
+      // pi-ai 段尚未就绪，piRoutes 不完整，会把 pi-ai 适配器误包装；
+      // 延迟重试到段就绪后再做（事件驱动路径也会再触发）。
+      scheduleRetry()
+      return
+    }
     const piRoutes = piAiRoutes()
     for (const [provider, registration] of llm.adapters) {
       // pi-ai 自有路由不包装：其线上翻译由第 2 步的线级供给完成
@@ -134,12 +164,17 @@ export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void 
     return result
   }
 
-  const runProvision = async (): Promise<void> => {
+  const runProvision = async (): Promise<boolean> => {
     const cfg = options()
-    if (!cfg.enabled) return
+    if (!cfg.enabled) return true
     const section = settings.get(PI_AI_NS) as { providers?: Record<string, PiAiProfile> } | undefined
+    if (section === undefined) {
+      // pi-ai settings 段尚未注册：延迟重试，直到段就绪。
+      scheduleRetry()
+      return false
+    }
     const providers = section?.providers
-    if (providers === undefined || Object.keys(providers).length === 0) return
+    if (providers === undefined || Object.keys(providers).length === 0) return true
     const ops: PathOp[] = []
     for (const [route, profile] of Object.entries(providers)) {
       const dialect = cfg.routes[route] ?? cfg.defaultDialect
@@ -179,7 +214,7 @@ export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void 
         ops.push(...newOps)
       }
     }
-    if (ops.length === 0) return
+    if (ops.length === 0) return true
     ctx.logger.info(`effort-slider: provisioning ${ops.length} field(s) across pi-ai models`)
     try {
       await settings.mutate(PI_AI_NS, ops)
@@ -187,6 +222,7 @@ export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void 
       ctx.logger.warn('effort-slider: pi-ai settings mutate refused')
       ctx.logger.warn(error)
     }
+    return true
   }
 
   let provisionTail: Promise<void> = Promise.resolve()
@@ -224,4 +260,12 @@ export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void 
 
   wrapAdapters()
   void provision()
+
+  ctx.effect(
+    () => () => {
+      if (retryTimer !== null) clearTimeout(retryTimer)
+      retryTimer = null
+    },
+    'ui-effort-slider: provisioning retry cleanup',
+  )
 }
