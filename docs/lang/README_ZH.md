@@ -13,7 +13,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.2.5-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.3.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -38,6 +38,8 @@
 
 ---
 
+> 🆕 **v0.3.0（适配 DSH 0.1.5）** — 迁移到当前 DeepSeek Harness API。`@deepseek-ai/dsh-client-runtime` 已不复存在，浏览器半区改为从 `@deepseek-ai/cordis` 取 `Context`；`ConnectionHandle` 不再暴露 `.api`，面板改为经 `ctx.modelDirectories` 读写每会话共享目录（与官方 `/model` 弹层、模型座位同一份状态）；宿主半区改用 `settings.installSection()` 安装设置段（`installSettingsSection` / `settingsNamespace` 已移除）；`llm.adapters` 私有化后，原先冗余的「适配器元数据包装」被删除 —— pi-ai 的 `reasoningEfforts` 供给本身同时提供线上字段与目录 `reasoning` 元数据。`pnpm typecheck` 重新全绿（218 → 0 错误）。
+>
 > 🔧 **v0.2.5** — 修复通用思考强度供给真正的落地 bug：显式 models 数组改为整数组替换（dsh-settings 的 path 补丁不能穿过数组中间节点，否则 models 被破坏、schema 拒绝、供给静默失败）。
 >
 > 🔧 **v0.2.4** — 修复通用思考强度供给在 pi-ai 设置段晚注册时永不落地：供给改为就绪重试（段注册晚于适配器且不触发 settings/updated），自定义模型现可稳定获得思考强度。
@@ -67,17 +69,23 @@
 
 只写 `reasoningEffort`，不动模型选择；无多档推理等级的模型显示「当前模型不提供多档推理等级」。
 
-### 通用思考强度（v0.2.0）
+### 通用思考强度（v0.2.0，v0.3.0 简化）
 
 **任何自定义的第三方模型/提供商都支持思考强度调节，且产生线上实际作用**：
 
-- **适配器元数据供给（宿主）**：对未声明 `reasoning` 元数据的模型自动注入通用 5 档刻度
-  （`off/low/medium/high/max` → OFF/Low/Medium/High/Ultracode），使官方模型菜单与本面板的选择器可用、请求校验通过；
 - **线级供给（宿主，pi-ai）**：自动为 `llm-pi-ai` 设置里缺少 `reasoningEfforts` 的自定义模型
   补写 `reasoningEfforts` 字典与 `compat` 线方言（**热生效，无需重启**），由 pi-ai 按方言把档位
-  翻译成真实的线上字段（`reasoning_effort` / `thinking` / OpenRouter `reasoning.effort` 等）；
+  翻译成真实的线上字段（`reasoning_effort` / `thinking` / OpenRouter `reasoning.effort` 等），
+  **同时把同一份声明作为该模型的 `reasoning` 目录元数据暴露出去** —— 手工声明的模型能出现官方
+  「推理等级」行，靠的就是这一点；
 - **客户端兜底刻度**：目录未返回 reasoning 元数据时，面板仍以通用 5 档刻度打开；
 - 用户已有的声明（`reasoningEfforts: false` 或自定义字典）一律尊重、不会被覆盖。
+
+> **为什么不再有适配器包装。** v0.2.5 及以前，宿主半区还会包装各适配器的 `resolveModel`，为未声明
+> `reasoning` 元数据的模型注入 `universalReasoning`。DSH 0.1.5 把 `llm.adapters` 变成了没有公开
+> 访问器的私有字段，这条路已不可行 —— 也不再必要：`reasoningEfforts` 是唯一同时喂给「请求线路」和
+> 「模型目录」的声明。模型级 `compat` 只在路由声明了 `api: openai-completions` 时写入，因为 pi-ai
+> 会拒绝「该模型协议读不到的开关」。
 
 支持的自定义端点线方言（设置 `effort-slider.defaultDialect` 或 `routes.<路由>`）：
 
@@ -94,23 +102,28 @@
 
 | 项目 | 值 |
 | --- | --- |
-| DSH 版本 | 官方安装版 web profile（Windows 验证） |
+| DSH 版本 | **0.1.5-rc.1**（npm `latest` dist-tag，本构建即针对该版本验证）；web profile，Windows |
+| 不再支持 | DSH ≤ 0.1.1 —— v0.2.5 及更早导入 `@deepseek-ai/dsh-client-runtime`，该包在 0.1.1-rc.2 之后已被移除 |
 | 安装机制 | `dsh plugin --profile web add`（bundle patch + 双半区） |
-| 依赖 | `dsh-base` / `dsh-web-app` 的 client runtime / connection / sessions 通道 |
+| 依赖 | `ctx.sessions`（`@deepseek-ai/dsh-api-session-controller`）与 `ctx.modelDirectories`（`@deepseek-ai/dsh-client-ui-model-selection`）；宿主：`ctx.llm`、`ctx.settings` |
+| 客户端模块请求 | 除平台基座（`react` / `react-dom/client` / `react/jsx-runtime`）外无任何请求 —— 所有 DSH import 都是纯类型、打包时被擦除 |
 
 ## 安装 / 卸载
 
 ```sh
-# 安装（推荐，与 dsh-navbar 等同一 bundle 机制）
+# GitHub 安装（lib/ 构建产物已提交，无需本地构建）
 dsh plugin --profile web add github:2768651338/dsh-effort-slider#main
 
-# 本地构建后安装（克隆本仓库）
-pnpm build
+# 或本地构建后从检出目录安装
+pnpm install && pnpm build
 dsh plugin --profile web add file:./dsh-effort-slider
 ```
 
 > 安装后**重启 DeepSeek Harness**，并在 Web 页面按一次 **Ctrl+F5**。
 > `lib/` 构建产物已提交，GitHub 安装无需本地构建。
+
+**从「固定在旧 DSH 上的版本」升级过来？** 请删掉 `~/.dsh/profiles/web/cordis.patch.yml` 里的
+`- id: ui-effort-slider` / `disabled: true` 行，否则新构建仍处于关闭状态。
 
 | 操作 | 命令 |
 | --- | --- |
@@ -148,16 +161,16 @@ effort-slider:
 | 范围 | 内容 |
 | --- | --- |
 | 文件（读） | 无 — 不读写任何用户文件（设置经 DSH settings 服务） |
-| 网络 | 无 — 浏览器半区只与本机 DSH `/api` RPC 端点通信 |
+| 网络 | 无自有网络请求 — 面板读写浏览器内的 Model Controller 共享目录，最终 `session.selectModel` 调用复用 DSH 既有连接 |
 | 凭据 | 永不读取 |
-| 用户数据 | 不读取（不接触会话内容/消息/提示词；仅经 sessions 通道读写当前会话的 `reasoningEffort`） |
+| 用户数据 | 不读取（不接触会话内容/消息/提示词；仅经共享模型目录读写当前会话的 provider/model/`reasoningEffort`） |
 
 ## 工作原理
 
 | 半区 | 文件 | 职责 |
 | --- | --- | --- |
-| 宿主 | `lib/index.js` | 通用思考强度供给：适配器元数据包装（`universalReasoning`）+ pi-ai 线级补丁（`buildProvisionOps`，幂等、尊重用户声明）+ `effort-slider` 设置段；监听 `llm/adapters-updated` / `settings/updated` 热生效 |
-| 浏览器 | `lib/client.js` | 捕获阶段拦截模型菜单「推理等级」行 → 弹出 Effort 面板；拖动节流写入 `selectModel({ reasoningEffort })`；面板关闭后经 MutationObserver 守护菜单行档位色 |
+| 宿主 | `lib/index.js` | 通用思考强度供给：pi-ai 线级补丁（`buildProvisionOps`，幂等、尊重用户声明）+ 经 `settings.installSection` 安装的 `effort-slider` 设置段；监听 `llm/adapters-updated` / `settings/updated` 热生效 |
+| 浏览器 | `lib/client.js` | 捕获阶段拦截模型菜单「推理等级」行 → 弹出 Effort 面板；经 `ctx.modelDirectories.directoryFor(sessionId)` 读目录、经 `directory.select({ reasoningEffort })` 写入；面板关闭后经 MutationObserver 守护菜单行档位色 |
 
 > 浏览器半区遵循官方外部插件约定：经典脚本 + `window.__ModuleLoader__.load` 工厂；
 > `react` / `react-dom/client` / `react/jsx-runtime` 走平台 externals；
@@ -169,21 +182,23 @@ effort-slider:
 | --- | --- |
 | 模型菜单没有「推理等级」行 | 该模型未声明 reasoning 元数据且宿主供给未生效 — 确认重启过 DSH，并检查 `~/.dsh/settings.yaml` 的 `effort-slider.enabled` |
 | 面板显示「当前模型不支持思考强度调节」 | 通用兜底未启用 — 升级到 v0.2.0+ 并重启 |
+| 插件根本没加载（行被标了 `disabled: true`） | 旧构建曾在 `~/.dsh/profiles/web/cordis.patch.yml` 里被关掉；删掉该行再重启 |
 | 拖动后档位不生效 | 检查目标端点的线方言是否匹配（见上方方言表），或为该路由显式设置 `defaultDialect` |
 | 与其它皮肤插件冲突 | 若同时安装了会拦截「推理等级」行的皮肤（如 dsh-ui-web 系列的 aurora），需将其拦截段禁用，避免双面板 |
 | 重启后版本仍显示旧版 | `file:` 安装是快照拷贝 — 用 `github:` 安装或重跑 add 后再重启 |
-| 日志在哪 | 宿主错误看 DSH 启动日志；客户端错误看浏览器 DevTools（F12）Console |
+| 日志在哪 | 宿主错误看 DSH 启动日志；客户端错误看浏览器 DevTools（F12）Console（`[effort-slider]` 前缀） |
 
 ## 结构
 
 ```text
 src/
-  index.ts                  宿主半区：通用思考强度供给（适配器元数据包装 + pi-ai 线级供给 + 设置段）
+  index.ts                  宿主半区：pi-ai 线级供给 + 设置段
   effort-core.ts             纯逻辑：方言 → 线级映射、供给补丁生成（单测覆盖）
   client/
     index.ts                浏览器半区：拦截模型菜单「推理等级」行 + 面板锚点挂载 + 菜单行着色
     css-modules.d.ts
     effort/
+      directory.ts          ctx.modelDirectories / ctx.sessions 的结构面（纯类型，不 import DSH 运行时）
       EffortPanel.tsx       Effort 面板（档位/刻度/滑块/辉光）
       useWebglFire.ts       WebGL2 三通道火焰循环（弹簧跟随 + 空闲休眠）
       shaders.ts            顶点/点火/模糊/合成着色器
@@ -191,16 +206,26 @@ src/
       effort.module.css     面板样式（lightningcss 内联注入）
 cordis.patch.yml           bundle 补丁（insert ui-effort-slider 行）
 lib/                       构建产物（client.js 附带 sourcemap）
-test/                      host.spec.mjs 宿主单测 + client.smoke.mjs 冒烟测试
+test/                      host.spec.mjs 宿主单测 + host-apply.spec.mjs + client.smoke.mjs 冒烟测试
 ```
 
 ## 开发
 
 ```sh
 pnpm install
-pnpm build   # tsdown → lib/index.js（宿主半区）+ lib/client.js（浏览器半区）
-pnpm test    # 宿主单测（方言/补丁幂等）+ jsdom 冒烟（拦截/渲染/吸附/兜底刻度/着色/回收）
+pnpm build       # tsdown → lib/index.js（宿主半区）+ lib/client.js（浏览器半区）
+pnpm typecheck   # tsc --noEmit（对 @deepseek-ai/* 0.1.5-rc.1 全绿）
+pnpm test        # 宿主单测 + apply 集成 + 真实接缝集成 + jsdom 冒烟
 ```
+
+`test/` 四层，由浅入深：
+
+| 文件 | 覆盖范围 |
+| --- | --- |
+| `host.spec.mjs` | 纯逻辑：方言 → 线级映射、供给补丁生成、幂等 |
+| `host-apply.spec.mjs` | mock cordis 上下文下的 `apply()`：pi-ai 设置段晚注册的重试、`compat` 按协议声明门控 |
+| `host-integration.spec.mjs` | **真实接缝**：真 `@deepseek-ai/cordis` + 真 `@deepseek-ai/dsh-settings-file` 提供方 —— `installSection` 注册、真实 path-op 落盘、写出的 `reasoningEfforts`/`compat` 通过 pi-ai 校验规则 |
+| `client.smoke.mjs` | jsdom：产物工厂材质化、拦截「推理等级」行、面板渲染、拖动/吸附经 `directory.select` 写入、着色、卸载回收 |
 
 **贡献.** Fork → 修改 → `pnpm build` → 跑 `pnpm test` → 向 `main` 开 PR。小修复（文档、测试）无需事先讨论；报告问题时附 DSH 版本与具体报错。
 

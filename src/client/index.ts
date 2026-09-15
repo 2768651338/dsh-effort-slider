@@ -3,19 +3,24 @@
  * 点击官方模型菜单里的「推理等级」行时，拦截官方档位列表，
  * 改为弹出 Effort 滑块面板（只写 reasoningEffort，不动模型选择）。
  * 所有写入由 ctx.effect 的 disposer 在卸载时回收。
+ *
+ * 数据与写入走 `ctx.modelDirectories`（每会话共享目录）而不是直连 RPC：
+ * 0.1.5 起 ConnectionHandle 不再暴露 `.api`，官方两个模型入口（/model 弹层与
+ * 输入框上方的模型座位）也都改从这份共享目录读写，本插件跟随同一份状态，
+ * 因此面板里的改动与官方入口永远一致。
  */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createRoot, type Root } from 'react-dom/client'
 import { createElement } from 'react'
 import { EffortPanel } from './effort/EffortPanel.tsx'
 import { effortColorFor, effortColorFromLabel } from './effort/effortColors.ts'
+import type { ModelDirectoriesLike, SessionsLike } from './effort/directory.ts'
 
 /** 档位颜色解析（客户端产物导出，供测试/复用）。 */
 export { effortColorFor }
 
-/** 需要的客户端服务：connection（模型目录读写）、sessions（当前会话）。 */
-export const inject: string[] = ['connection', 'sessions']
+/** 需要的客户端服务：sessions（当前会话）与 modelDirectories（每会话共享模型目录）。 */
+export const inject: string[] = ['sessions', 'modelDirectories']
 
 /** 面板尺寸（与 effort.module.css 的 .panel 宽度一致）。 */
 const PANEL_W = 280
@@ -57,7 +62,6 @@ function paintEffortRow(row: HTMLElement, effortId: string): void {
   const tone = effortColorFor(effortId)
   value.style.color = tone.color
   value.style.textShadow = tone.glow ?? 'none'
-  console.log('[effort-slider] paint:', JSON.stringify((value.textContent ?? '').trim()), '→', tone.color, row.isConnected ? '' : '(detached)')
 }
 
 /**
@@ -66,7 +70,7 @@ function paintEffortRow(row: HTMLElement, effortId: string): void {
  * 复用节点改文本、字符数据原地更新，都会在下一次扫描时被覆盖。
  */
 function paintAllEffortRows(): void {
-  for (const row of Array.from(document.querySelectorAll('button[role="menuitem"]'))) {
+  for (const row of Array.from(document.querySelectorAll<HTMLElement>('button[role="menuitem"]'))) {
     const text = (row.textContent ?? '').trim()
     if (!(text.startsWith('推理等级') || text.startsWith('Effort'))) continue
     const value = effortValueSpan(row)
@@ -89,7 +93,7 @@ function paintAllEffortRows(): void {
  * 这里给档位名涂上与菜单行一致的颜色（菜单关闭后触发按钮常驻可见）。
  */
 function paintTriggerEffort(): void {
-  for (const trigger of Array.from(document.querySelectorAll('button[aria-haspopup="menu"]'))) {
+  for (const trigger of Array.from(document.querySelectorAll<HTMLElement>('button[aria-haspopup="menu"]'))) {
     const aria = trigger.getAttribute('aria-label') ?? ''
     // 只有显示档位的触发器才带「推理等级 / reasoning effort」的可访问标签。
     if (!(aria.includes('推理等级') || aria.includes('reasoning effort'))) continue
@@ -130,6 +134,13 @@ const schedulePaintAll = (): void => {
 export function apply(ctx: ClientContext): void {
   const body = document.body
 
+  const sessions = ctx.get('sessions') as SessionsLike | undefined
+  const directories = ctx.get('modelDirectories') as ModelDirectoriesLike | undefined
+  if (sessions === undefined || directories === undefined) {
+    console.warn('[effort-slider] sessions/modelDirectories service unavailable — panel disabled')
+    return
+  }
+
   // 固定挂载点：0x0 锚点 div 挂在 body 下，面板按触发行位置绝对定位。
   const host = document.createElement('div')
   host.dataset.effortSliderHost = ''
@@ -157,7 +168,7 @@ export function apply(ctx: ClientContext): void {
     if (root === null) root = createRoot(host)
     root.render(createElement(EffortPanel, {
       sessionId,
-      connection: ctx.get('connection') as ConnectionHandle,
+      directory: directories.directoryFor(sessionId),
       onClose: hidePanel,
       onEffortChange,
     }))
@@ -171,9 +182,7 @@ export function apply(ctx: ClientContext): void {
 
   // 官方菜单每次打开都会重新挂载行、档位文本变化会替换文本节点；
   // MutationObserver 守护这些重渲染，保证颜色在面板关闭后依然生效。
-  // 官方菜单每次打开都会重新挂载（常常整树原子提交）、档位文本变化会替换或
-  // 原地更新文本节点；任何 DOM 变化都触发一次节流全量扫描，保证颜色在面板
-  // 关闭后依然生效，且不依赖 mutation 的具体粒度。
+  // 任何 DOM 变化都触发一次节流全量扫描，不依赖 mutation 的具体粒度。
   const paintObserver = typeof MutationObserver === 'undefined'
     ? null
     : new MutationObserver(() => schedulePaintAll())
@@ -182,26 +191,24 @@ export function apply(ctx: ClientContext): void {
   }
 
   const onDocClick = (event: MouseEvent): void => {
-    const target = event.target as HTMLElement
+    const target = event.target as HTMLElement | null
     // 面板内部交互不处理。
-    if (host.contains(target)) return
-    const row = target.closest?.('button[role="menuitem"]')
+    if (target !== null && host.contains(target)) return
+    const row = target?.closest?.('button[role="menuitem"]')
     if (row instanceof HTMLElement) {
       const text = (row.textContent ?? '').trim()
       // 官方 root 菜单的第二行：label「推理等级」/「Effort」。
       if (text.startsWith('推理等级') || text.startsWith('Effort')) {
-        console.log('[effort-slider] intercept row:', JSON.stringify(text))
         event.preventDefault()
         event.stopPropagation()
         paintAllEffortRows()
-        const current = (ctx.get('sessions') as { list: { getSnapshot(): { current?: string } } }).list.getSnapshot().current
-        console.log('[effort-slider] session:', current)
+        const current = sessions.list.getSnapshot().current
         if (current !== undefined) showPanel(current, row)
         else console.warn('[effort-slider] no session id')
         return
       }
     }
-    if (!host.contains(target)) hidePanel()
+    hidePanel()
   }
   document.addEventListener('click', onDocClick, true)
 

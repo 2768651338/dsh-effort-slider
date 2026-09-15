@@ -43,5 +43,5 @@ export const effortColorFromLabel = (label: string): EffortColor | null => {
   const key = label.trim().toLowerCase()
   const id = LABEL_ALIASES[key]
   if (id === undefined) return null
-  return EFFORT_COLORS[id]
+  return EFFORT_COLORS[id] ?? null
 }
