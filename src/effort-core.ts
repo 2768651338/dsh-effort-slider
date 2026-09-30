@@ -41,7 +41,7 @@ export function universalReasoning(defaultEffort: string = 'off'): {
  * 每个线方言的线级映射：reasoningEfforts 字典（pi-ai THINKING_LEVELS 词汇），
  * off 恒为 null（pi-ai 语义：声明支持、不发参数），其余档位为线上拼写。
  */
-const WIRE: Record<string, Record<string, string | null>> = {
+const WIRE: Record<string, string | null> = {
   off: null,
   low: 'low',
   medium: 'medium',
@@ -105,16 +105,14 @@ export function wireFor(
 
 export interface PiAiProfile {
   api?: string
-  models?: Array<{ id: string; reasoningEfforts?: unknown }>
-  modelOverrides?: Record<string, { reasoningEfforts?: unknown }>
+  models?: Array<{ id: string; reasoningEfforts?: unknown; compat?: unknown }>
+  modelOverrides?: Record<string, { reasoningEfforts?: unknown; compat?: unknown }>
 }
 
 /** settings.mutate 的路径操作（数组下标按服务要求传字符串）。 */
-export interface PathOp {
-  op: 'set' | 'unset'
-  path: string[]
-  value?: unknown
-}
+export type PathOp =
+  | { op: 'set'; path: string[]; value: unknown }
+  | { op: 'unset'; path: string[] }
 
 function deepEqualJson(a: unknown, b: unknown): boolean {
   if (a === b) return true

@@ -31,16 +31,20 @@ export function useWebglFire(
   const ensureLoopRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (canvas === null) {
+    const canvasElement = canvasRef.current
+    if (canvasElement === null) {
       console.warn('[effort-slider] fire: canvas not found')
       return
     }
-    const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: false, antialias: false })
-    if (gl === null) {
+    const glContext = canvasElement.getContext('webgl2', { preserveDrawingBuffer: false, antialias: false })
+    if (glContext === null) {
       console.warn('[effort-slider] fire: webgl2 context unavailable (browser GPU/hardware acceleration off?)')
       return
     }
+    // 非空常量别名：函数声明里的闭包不会继承外部 if 的窄化，绑定到显式
+    // 非空类型后，下面所有 gl./canvas. 调用无需逐个断言。
+    const gl: WebGL2RenderingContext = glContext
+    const canvas: HTMLCanvasElement = canvasElement
 
     let rafId: number | null = null
     let resizeObserver: ResizeObserver | null = null
@@ -67,7 +71,31 @@ export function useWebglFire(
     let blurH: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null
     let blurV: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null
 
-    const U: Record<string, WebGLUniformLocation | null> = {}
+    /** 每趟程序的 uniform 位置（未找到为 null，与 WebGL 的 uniform* 入参一致）。 */
+    interface Uniforms {
+      simTime: WebGLUniformLocation | null
+      simSlider: WebGLUniformLocation | null
+      simElapsed: WebGLUniformLocation | null
+      simBack: WebGLUniformLocation | null
+      blurDir: WebGLUniformLocation | null
+      blurExt: WebGLUniformLocation | null
+      blurTex: WebGLUniformLocation | null
+      blurRes: WebGLUniformLocation | null
+      compScene: WebGLUniformLocation | null
+      compGlow: WebGLUniformLocation | null
+    }
+    const U: Uniforms = {
+      simTime: null,
+      simSlider: null,
+      simElapsed: null,
+      simBack: null,
+      blurDir: null,
+      blurExt: null,
+      blurTex: null,
+      blurRes: null,
+      compScene: null,
+      compGlow: null,
+    }
 
     const onContextLost = (e: Event): void => e.preventDefault()
     const onContextRestored = (): void => {

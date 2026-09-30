@@ -1,8 +1,11 @@
 /**
- * 宿主 apply 集成测试：验证 pi-ai settings 段晚注册时的供给重试时序。
- * 关键回归：pi-ai 先 registerAdapter（emit llm/adapters-updated）后
- * installSettingsSection，且 register 不触发 settings/updated —— 供给在
- * 段就绪前空跑后必须能延迟重试并最终落地（否则任何自定义模型都无思考强度）。
+ * 宿主 apply 集成测试（适配 0.1.5 的 settings.installSection / 无公开 adapter 注册表）。
+ *
+ * 关键回归 1：pi-ai 先 registerAdapter（emit llm/adapters-updated）后
+ *   installSection，且注册本身不触发 settings/updated —— 供给在段就绪前空跑后
+ *   必须能延迟重试并最终落地（否则任何自定义模型都无思考强度）。
+ * 关键回归 2：模型级 compat 只对声明了 openai-completions 的路由注入，
+ *   未声明 api 的路由只注入 reasoningEfforts（pi-ai 会拒绝协议读不到的开关）。
  * 运行：node test/host-apply.spec.mjs
  */
 
@@ -14,7 +17,6 @@ function assert(cond, msg) {
 
 // ---- mock setTimeout（捕获回调 + 延迟，供手动快进）----
 const timers = []
-const realSetTimeout = globalThis.setTimeout
 globalThis.setTimeout = (fn, ms) => { timers.push({ fn, ms }); return timers.length }
 globalThis.clearTimeout = () => {}
 const flush = async (n = 20) => { for (let i = 0; i < n; i++) await Promise.resolve() }
@@ -22,14 +24,30 @@ const flush = async (n = 20) => { for (let i = 0; i < n; i++) await Promise.reso
 // ---- 可切换的 pi-ai settings 段 ----
 let piAiSection = undefined
 const mutations = []
+let installedSection = null
+/** 极简 path-op 落地器：模拟真实 provider 持久化后重新发布文档。 */
+const applyOps = (doc, ops) => {
+  for (const op of ops) {
+    if (op.op !== 'set') continue
+    let node = doc
+    for (let i = 0; i < op.path.length - 1; i++) {
+      if (typeof node[op.path[i]] !== 'object' || node[op.path[i]] === null) node[op.path[i]] = {}
+      node = node[op.path[i]]
+    }
+    node[op.path[op.path.length - 1]] = op.value
+  }
+}
 const settings = {
+  installSection: (owner, ns, schema, entry, hooks) => { installedSection = { ns, entry, hooks } },
   get: (ns) => (ns === 'llm-pi-ai' ? piAiSection : undefined),
-  mutate: async (ns, ops) => { mutations.push({ ns, ops }) },
+  mutate: async (ns, ops) => {
+    mutations.push({ ns, ops })
+    if (ns === 'llm-pi-ai') applyOps(piAiSection, ops)
+  },
 }
 
-// ---- mock llm ----
+// ---- mock llm（0.1.5 起 adapters 注册表已私有，公开面只剩这两个查询）----
 const llm = {
-  adapters: new Map(),
   listModels: async () => [],
   resolveModelInfo: async () => ({}),
 }
@@ -41,35 +59,25 @@ const ctx = {
   get: (name) => (name === 'llm' ? llm : name === 'settings' ? settings : undefined),
   on: (ev, fn) => { listeners[ev] = fn },
   effect: (fn, label) => { disposers.push(fn()) },
-  inject: (deps, cb) => {
-    // installSettingsSection 会 inject ['settings']：返回一个极简 scope
-    const sctx = {
-      settings: {
-        register: (ns, schema, opts) => ({
-          get: () => opts.base,
-          watch: () => () => {},
-        }),
-      },
-      effect: (fn) => { disposers.push(fn()) },
-    }
-    cb(sctx)
-  },
   logger: { info() {}, warn() {}, error() {} },
 }
 
 // ---- 加载宿主产物 ----
 const mod = await import('../lib/index.js')
 assert(typeof mod.apply === 'function', 'host apply exported')
+assert(JSON.stringify(mod.inject) === JSON.stringify(['llm', 'settings']), 'host inject = [llm, settings]')
 
 // ---- apply：pi-ai 段尚未注册 ----
 mod.apply(ctx, {})
 await flush()
 assert(piAiSection === undefined, 'precondition: pi-ai section unregistered at apply time')
+assert(installedSection !== null && installedSection.ns === 'effort-slider', 'effort-slider settings section installed via settings.installSection')
 assert(timers.length > 0, 'provision scheduled a retry while pi-ai section is unready')
 
-// ---- pi-ai 段就绪（模拟 installSettingsSection 注册完成）----
+// ---- pi-ai 段就绪（模拟 installSection 注册完成）----
 piAiSection = {
   providers: {
+    // 声明了协议：应同时注入 reasoningEfforts 与模型级 compat
     jiyuanlvdong: {
       api: 'openai-completions',
       models: [
@@ -77,11 +85,14 @@ piAiSection = {
         { id: 'claude-3' },
       ],
     },
+    // 未声明协议：只注入 reasoningEfforts（compat 会被 pi-ai 拒绝）
+    gateway: {
+      models: [{ id: 'm-1' }],
+    },
   },
 }
 
 // ---- 快进一个重试周期 ----
-const before = timers.length
 for (const t of timers.slice()) t.fn()
 await flush()
 
@@ -89,13 +100,26 @@ const piAiMutations = mutations.filter((m) => m.ns === 'llm-pi-ai')
 assert(piAiMutations.length > 0, 'provision mutated llm-pi-ai after section became ready')
 if (piAiMutations.length > 0) {
   const allOps = piAiMutations.flatMap((m) => m.ops)
-  assert(allOps.length === 1 && allOps[0].path.join('/') === 'providers/jiyuanlvdong/models', 'provision emits ONE whole-array set op')
-  const value = allOps[0].value
-  assert(Array.isArray(value) && value.length === 2, 'whole-array value keeps both models')
-  assert(value[0].reasoningEfforts !== undefined && value[0].reasoningEfforts.off === null && value[0].reasoningEfforts.max === 'max', 'model 0 got reasoningEfforts (off→null, max→max)')
-  assert(value[1].reasoningEfforts !== undefined, 'model 1 got reasoningEfforts')
-  assert(value[0].compat?.supportsReasoningEffort === true, 'compat.supportsReasoningEffort true on effort dialect')
+  const byPath = new Map(allOps.map((op) => [op.path.join('/'), op.value]))
+  assert(allOps.length === 2, 'provision emits one whole-array set op per route with explicit models')
+
+  const declared = byPath.get('providers/jiyuanlvdong/models')
+  assert(Array.isArray(declared) && declared.length === 2, 'declared-api route: whole-array value keeps both models')
+  assert(declared?.[0].reasoningEfforts?.off === null && declared?.[0].reasoningEfforts?.max === 'max', 'model 0 got reasoningEfforts (off→null, max→max)')
+  assert(declared?.[1].reasoningEfforts !== undefined, 'model 1 got reasoningEfforts')
+  assert(declared?.[0].compat?.supportsReasoningEffort === true, 'declared-api route: compat.supportsReasoningEffort true on effort dialect')
+
+  const undeclared = byPath.get('providers/gateway/models')
+  assert(Array.isArray(undeclared) && undeclared.length === 1, 'undeclared-api route: whole-array value keeps its model')
+  assert(undeclared?.[0].reasoningEfforts !== undefined, 'undeclared-api route still gets reasoningEfforts')
+  assert(undeclared?.[0].compat === undefined, 'undeclared-api route gets NO compat (protocol unknown)')
 }
+
+// ---- 幂等：已供给过的配置不再产生写入 ----
+mutations.length = 0
+listeners['llm/adapters-updated']?.()
+await flush()
+assert(mutations.length === 0, 'second provision pass is idempotent (no writes)')
 
 console.log(failures === 0 ? 'ALL HOST APPLY SPECS PASSED' : failures + ' CHECK(S) FAILED')
 if (failures > 0) process.exit(1)
