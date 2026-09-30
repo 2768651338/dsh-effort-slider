@@ -4,3 +4,4 @@ node_modules/
 .DS_Store
 # 本机专属安装说明（含绝对路径），不随仓库发布
 INSTALL.md
+/.mimosa/

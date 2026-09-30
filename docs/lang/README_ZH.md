@@ -38,21 +38,23 @@
 
 ---
 
-> 🆕 **v0.3.0（适配 DSH 0.1.5）** — 迁移到当前 DeepSeek Harness API。`@deepseek-ai/dsh-client-runtime` 已不复存在，浏览器半区改为从 `@deepseek-ai/cordis` 取 `Context`；`ConnectionHandle` 不再暴露 `.api`，面板改为经 `ctx.modelDirectories` 读写每会话共享目录（与官方 `/model` 弹层、模型座位同一份状态）；宿主半区改用 `settings.installSection()` 安装设置段（`installSettingsSection` / `settingsNamespace` 已移除）；`llm.adapters` 私有化后，原先冗余的「适配器元数据包装」被删除 —— pi-ai 的 `reasoningEfforts` 供给本身同时提供线上字段与目录 `reasoning` 元数据。`pnpm typecheck` 重新全绿（218 → 0 错误）。
+> 🆕 **v0.3.0** — 适配 DSH 0.1.5：客户端 `Context` 改取自 `@deepseek-ai/cordis`，会话状态经 `ctx.modelDirectories` 读写，设置段经 `settings.installSection()` 安装；删除已不可行的适配器元数据包装（见下方「通用思考强度」一节）。不再支持 DSH ≤ 0.1.1。
 >
-> 🔧 **v0.2.5** — 修复通用思考强度供给真正的落地 bug：显式 models 数组改为整数组替换（dsh-settings 的 path 补丁不能穿过数组中间节点，否则 models 被破坏、schema 拒绝、供给静默失败）。
+> 🔧 **v0.2.5** — 修复通用供给在显式 `models` 数组上静默失败（dsh-settings 的 path 补丁不能穿过数组节点，现改为整数组替换）。
 >
-> 🔧 **v0.2.4** — 修复通用思考强度供给在 pi-ai 设置段晚注册时永不落地：供给改为就绪重试（段注册晚于适配器且不触发 settings/updated），自定义模型现可稳定获得思考强度。
+> 🔧 **v0.2.4** — 修复 pi-ai 设置段晚注册时通用供给永不落地（现改为就绪重试）。
 >
-> 🆕 **v0.2.3** — 模型座位的入口按钮（输入框上方「模型 · 档位」）档位名也按档位着色，菜单关闭后常驻可见。
+> 🆕 **v0.2.3** — 模型座位入口按钮的档位名也按档位着色，菜单关闭后常驻可见。
 >
-> 🔧 **v0.2.2** — 修复菜单行着色在官方菜单重开（整树重挂载）时失效：涂色改为全量扫描 + 任意 DOM 变化节流重涂，面板未上报档位时从档位文本反推颜色。
+> 🔧 **v0.2.2** — 修复菜单整树重挂载时菜单行着色失效（全量节流重涂；档位色可由档位文本反推）。
 >
-> 🆕 **v0.2.1** — 面板关闭后，模型菜单「推理等级」行上的档位值沿用档位色（OFF 粉灰 / Low 橙金 / Medium 蓝 / High 紫 / Ultracode 亮紫辉光）。
+> 🆕 **v0.2.1** — 面板关闭后，模型菜单「推理等级」行上的档位值保留档位色。
 >
-> ✨ **v0.2.0** — 任何自定义第三方模型/提供商都支持思考强度调节，且线上真实生效（适配器元数据供给 + pi-ai 线级供给，热生效）。
+> ✨ **v0.2.0** — 任何自定义第三方模型/提供商的思考强度调节真实生效（热生效）。
 >
 > 🎛️ **v0.1.0** — 初始版本：拦截官方「推理等级」菜单，弹出仿 Claude Code 的 Effort 滑块面板。
+>
+> 各版本完整说明见 [Releases](https://github.com/2768651338/dsh-effort-slider/releases)。
 
 ---
 

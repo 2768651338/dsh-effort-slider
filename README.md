@@ -30,21 +30,23 @@ Click the **Effort** row (second row of the official model menu) instead of the 
 
 ---
 
-> 🆕 **v0.3.0 (DSH 0.1.5)** — Ported to the current DeepSeek Harness API. `@deepseek-ai/dsh-client-runtime` no longer exists, so the browser half now takes its `Context` from `@deepseek-ai/cordis`; `ConnectionHandle` no longer exposes `.api`, so the panel reads and writes the per-session shared directory through `ctx.modelDirectories` (the same state the official `/model` popup and composer model seat use); the host half installs its settings section through `settings.installSection()` (`installSettingsSection` / `settingsNamespace` are gone), and since `llm.adapters` is now private the redundant adapter-metadata wrapper was dropped — pi-ai `reasoningEfforts` provisioning alone supplies both the wire fields **and** the catalog `reasoning` metadata. `pnpm typecheck` is green again (218 → 0 errors).
+> 🆕 **v0.3.0** — Ported to DSH 0.1.5: client `Context` now comes from `@deepseek-ai/cordis`, per-session state is read/written via `ctx.modelDirectories`, and the settings section is installed via `settings.installSection()`; the adapter-metadata wrapper was dropped (see [Universal effort provisioning](#universal-effort-provisioning-v020-simplified-in-v030)). DSH ≤ 0.1.1 is no longer supported.
 >
-> 🔧 **v0.2.5** — Fixed the real landing bug in universal effort provisioning: explicit `models` arrays are now replaced as a whole (dsh-settings path ops cannot traverse array nodes, otherwise `models` is corrupted, the schema rejects the write, and provisioning fails silently).
+> 🔧 **v0.2.5** — Fixed universal provisioning failing silently on explicit `models` arrays (dsh-settings path ops cannot traverse array nodes — the array is now replaced as a whole).
 >
-> 🔧 **v0.2.4** — Fixed universal effort provisioning never landing when the pi-ai settings section registers late: provisioning now retries until the section is ready (registration happens after the adapter and does not emit `settings/updated`).
+> 🔧 **v0.2.4** — Fixed universal provisioning never landing when the pi-ai settings section registers late (now retries until the section is ready).
 >
-> 🆕 **v0.2.3** — The model-seat trigger button (「model · effort」 above the composer) also color-codes its effort name, persistent after the menu closes.
+> 🆕 **v0.2.3** — The model-seat trigger button also color-codes its effort name, persistent after the menu closes.
 >
-> 🔧 **v0.2.2** — Fixed menu-row coloring breaking on whole-tree menu remounts: painting now does a full scan and re-paints on any DOM change (throttled), and infers the color from the effort text when the panel has not reported one yet.
+> 🔧 **v0.2.2** — Fixed menu-row coloring breaking on whole-menu remounts (full-scan throttled repaint; color inferred from the effort text).
 >
-> 🆕 **v0.2.1** — After the panel closes, the effort value on the model menu's Effort row keeps its level color (OFF rose-gray / Low amber / Medium blue / High purple / Ultracode bright purple with glow).
+> 🆕 **v0.2.1** — The effort value on the model menu's Effort row keeps its level color after the panel closes.
 >
-> ✨ **v0.2.0** — Any custom third-party model/provider gets working thinking-effort control (adapter metadata provisioning + pi-ai wire-level provisioning, hot-applied).
+> ✨ **v0.2.0** — Any custom third-party model/provider gets working thinking-effort control (hot-applied).
 >
 > 🎛️ **v0.1.0** — Initial release: intercepts the official Effort menu and shows a Claude Code–style Effort slider panel.
+>
+> Full notes for each version: [Releases](https://github.com/2768651338/dsh-effort-slider/releases)
 
 ---
 
