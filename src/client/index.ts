@@ -14,7 +14,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { createElement } from 'react'
 import { EffortPanel } from './effort/EffortPanel.tsx'
 import { effortColorFor, effortColorFromLabel } from './effort/effortColors.ts'
-import type { ModelDirectoriesLike, SessionsLike } from './effort/directory.ts'
+import { currentSessionId, type ModelDirectoriesLike, type SessionsLike } from './effort/directory.ts'
 
 /** 档位颜色解析（客户端产物导出，供测试/复用）。 */
 export { effortColorFor }
@@ -202,7 +202,7 @@ export function apply(ctx: ClientContext): void {
         event.preventDefault()
         event.stopPropagation()
         paintAllEffortRows()
-        const current = sessions.list.getSnapshot().current
+        const current = currentSessionId(sessions)
         if (current !== undefined) showPanel(current, row)
         else console.warn('[effort-slider] no session id')
         return

@@ -1,8 +1,9 @@
 /**
- * dsh-effort-slider 客户端冒烟测试（适配 0.1.5 的 modelDirectories 共享目录）：
- * 在 jsdom 中执行 lib/client.js 工厂，模拟点击模型菜单「推理等级」行，
- * 验证 Effort 面板挂载、目录加载、OFF/MAX 刻度、档位状态、
- * 拖动节流写入 + 松手吸附，以及关闭/卸载回收。
+ * dsh-effort-slider 客户端冒烟测试（适配 DSH 0.2.0 的 modelDirectories 共享目录
+ * 与会话目录新形状：0.2.0 起 SessionListState 移除 current 字段，当前会话
+ * 由 retainedBy.mainView > 0 判定）：在 jsdom 中执行 lib/client.js 工厂，
+ * 模拟点击模型菜单「推理等级」行，验证 Effort 面板挂载、目录加载、OFF/MAX
+ * 刻度、档位状态、拖动节流写入 + 松手吸附，以及关闭/卸载回收。
  * 运行：node test/client.smoke.mjs
  */
 import { readFileSync } from 'node:fs'
@@ -98,7 +99,8 @@ const directory = createDirectory({
   status: 'ready',
 })
 
-const sessions = { list: { getSnapshot: () => ({ current: 'sess-1' }) } }
+// 0.2.0 会话目录形状：无 current 字段，当前会话 = retainedBy.mainView > 0 的行。
+const sessions = { list: { getSnapshot: () => ({ ids: ['sess-1'], byId: { 'sess-1': { id: 'sess-1', retainedBy: { mainView: 1 } } }, phase: 'ready' }) } }
 let disposer = null
 const ctx = {
   get: (name) => (name === 'sessions' ? sessions : name === 'modelDirectories' ? { directoryFor: () => directory } : undefined),

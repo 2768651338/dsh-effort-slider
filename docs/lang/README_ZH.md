@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.3.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.4.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -40,6 +40,8 @@
 
 ---
 
+> 🆕 **v0.4.0** — 适配 DSH **0.2.0**：DSH 用 `SettingsForms` 取代了原有 settings 服务（设置现以 profile entry 配置形式存在；`installSection` / `settings.get` / `settings/updated` 均已移除）。宿主半区现定位 pi-ai profile entry（`llm-pi-ai`），经 `settings.describe()` 读取、经 `settings.mutate()` 写入，并监听 `settings/document-updated`。客户端半区改由 `retainedBy.mainView` 推导当前会话（`SessionListState.current` 已移除）。插件选项（`enabled` / `defaultDialect` / `routes`）存于插件的 entry 配置，可在 DSH 设置页编辑。不再支持 DSH ≤ 0.1.5（该版本请使用 v0.3.0）。
+>
 > 🆕 **v0.3.0** — 适配 DSH 0.1.5：客户端 `Context` 改取自 `@deepseek-ai/cordis`，会话状态经 `ctx.modelDirectories` 读写，设置段经 `settings.installSection()` 安装；删除已不可行的适配器元数据包装（见下方「通用思考强度」一节）。不再支持 DSH ≤ 0.1.1。
 >
 > 🔧 **v0.2.5** — 修复通用供给在显式 `models` 数组上静默失败（dsh-settings 的 path 补丁不能穿过数组节点，现改为整数组替换）。
@@ -106,10 +108,10 @@
 
 | 项目 | 值 |
 | --- | --- |
-| DSH 版本 | **0.1.5-rc.1**（npm `latest` dist-tag，本构建即针对该版本验证）；web profile，Windows |
-| 不再支持 | DSH ≤ 0.1.1 —— v0.2.5 及更早导入 `@deepseek-ai/dsh-client-runtime`，该包在 0.1.1-rc.2 之后已被移除 |
+| DSH 版本 | **0.2.0-rc.2**（npm `latest` dist-tag，本构建即针对该版本验证）；web profile，Windows |
+| 不再支持 | DSH ≤ 0.1.5 —— v0.4.0 面向 0.2.0 引入的 `SettingsForms` settings 服务（DSH 0.1.5 请使用 v0.3.0；v0.2.5 及更早还导入了 `@deepseek-ai/dsh-client-runtime`，该包在 0.1.1-rc.2 之后已被移除） |
 | 安装机制 | `dsh plugin --profile web add`（bundle patch + 双半区） |
-| 依赖 | `ctx.sessions`（`@deepseek-ai/dsh-api-session-controller`）与 `ctx.modelDirectories`（`@deepseek-ai/dsh-client-ui-model-selection`）；宿主：`ctx.llm`、`ctx.settings` |
+| 依赖 | `ctx.sessions`（`@deepseek-ai/dsh-api-session-controller`）与 `ctx.modelDirectories`（`@deepseek-ai/dsh-client-ui-model-selection`）；宿主：`ctx.llm`、`ctx.settings`（`SettingsForms`） |
 | 客户端模块请求 | 除平台基座（`react` / `react-dom/client` / `react/jsx-runtime`）外无任何请求 —— 所有 DSH import 都是纯类型、打包时被擦除 |
 
 ## 安装 / 卸载
@@ -147,7 +149,7 @@ DevTools Console 出现 `[effort-slider] intercept row: ...` 表示拦截成功�
 
 | 项目 | 详情 |
 | --- | --- |
-| 插件级选项 | `effort-slider` 设置段（写入 `~/.dsh/settings.yaml` 即热生效） |
+| 插件级选项 | 插件的 profile entry 配置（`enabled` / `defaultDialect` / `routes`），可在 DSH 设置页（自动生成的表单）编辑，插件重挂载时生效 |
 | 默认值 | `enabled: true`，`defaultDialect: effort` |
 | 环境变量 | 无自有变量，遵循 DSH 的 `DSH_HOME` 解析 |
 | 敏感项 | 无 — 不读取、不存储任何密钥/令牌/凭据 |
@@ -173,7 +175,7 @@ effort-slider:
 
 | 半区 | 文件 | 职责 |
 | --- | --- | --- |
-| 宿主 | `lib/index.js` | 通用思考强度供给：pi-ai 线级补丁（`buildProvisionOps`，幂等、尊重用户声明）+ 经 `settings.installSection` 安装的 `effort-slider` 设置段；监听 `llm/adapters-updated` / `settings/updated` 热生效 |
+| 宿主 | `lib/index.js` | 通用思考强度供给：定位 pi-ai profile entry（`llm-pi-ai`），经 `settings.describe()` 读取，经 `settings.mutate` 补写线方言（`buildProvisionOps`，幂等、尊重用户声明）；监听 `llm/adapters-updated` / `settings/document-updated` |
 | 浏览器 | `lib/client.js` | 捕获阶段拦截模型菜单「推理等级」行 → 弹出 Effort 面板；经 `ctx.modelDirectories.directoryFor(sessionId)` 读目录、经 `directory.select({ reasoningEffort })` 写入；面板关闭后经 MutationObserver 守护菜单行档位色 |
 
 > 浏览器半区遵循官方外部插件约定：经典脚本 + `window.__ModuleLoader__.load` 工厂；
@@ -184,7 +186,7 @@ effort-slider:
 
 | 现象 | 解决 |
 | --- | --- |
-| 模型菜单没有「推理等级」行 | 该模型未声明 reasoning 元数据且宿主供给未生效 — 确认重启过 DSH，并检查 `~/.dsh/settings.yaml` 的 `effort-slider.enabled` |
+| 模型菜单没有「推理等级」行 | 该模型未声明 reasoning 元数据且宿主供给未生效 — 确认重启过 DSH，并在插件的设置页（其 profile entry 配置）检查 `enabled` |
 | 面板显示「当前模型不支持思考强度调节」 | 通用兜底未启用 — 升级到 v0.2.0+ 并重启 |
 | 插件根本没加载（行被标了 `disabled: true`） | 旧构建曾在 `~/.dsh/profiles/web/cordis.patch.yml` 里被关掉；删掉该行再重启 |
 | 拖动后档位不生效 | 检查目标端点的线方言是否匹配（见上方方言表），或为该路由显式设置 `defaultDialect` |
@@ -196,7 +198,7 @@ effort-slider:
 
 ```text
 src/
-  index.ts                  宿主半区：pi-ai 线级供给 + 设置段
+  index.ts                  宿主半区：经 SettingsForms 接缝的 pi-ai 线级供给
   effort-core.ts             纯逻辑：方言 → 线级映射、供给补丁生成（单测覆盖）
   client/
     index.ts                浏览器半区：拦截模型菜单「推理等级」行 + 面板锚点挂载 + 菜单行着色
@@ -218,7 +220,7 @@ test/                      host.spec.mjs 宿主单测 + host-apply.spec.mjs + cl
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js（宿主半区）+ lib/client.js（浏览器半区）
-pnpm typecheck   # tsc --noEmit（对 @deepseek-ai/* 0.1.5-rc.1 全绿）
+pnpm typecheck   # tsc --noEmit（对 @deepseek-ai/* 0.2.0-rc.2 全绿）
 pnpm test        # 宿主单测 + apply 集成 + 真实接缝集成 + jsdom 冒烟
 ```
 
@@ -227,8 +229,8 @@ pnpm test        # 宿主单测 + apply 集成 + 真实接缝集成 + jsdom 冒�
 | 文件 | 覆盖范围 |
 | --- | --- |
 | `host.spec.mjs` | 纯逻辑：方言 → 线级映射、供给补丁生成、幂等 |
-| `host-apply.spec.mjs` | mock cordis 上下文下的 `apply()`：pi-ai 设置段晚注册的重试、`compat` 按协议声明门控 |
-| `host-integration.spec.mjs` | **真实接缝**：真 `@deepseek-ai/cordis` + 真 `@deepseek-ai/dsh-settings-file` 提供方 —— `installSection` 注册、真实 path-op 落盘、写出的 `reasoningEfforts`/`compat` 通过 pi-ai 校验规则 |
+| `host-apply.spec.mjs` | mock cordis 上下文下的 `apply()`：pi-ai entry 晚注册的重试、`compat` 按协议声明门控、`settings/document-updated` 幂等 |
+| `host-integration.spec.mjs` | **真实接缝**：真 `@deepseek-ai/cordis` + 忠实的 `SettingsForms` 接缝替身（0.2.0 的 npm 包没有独立提供方）—— entry 发现、真实 path-op 落盘进 profile entry 配置、写出的 `reasoningEfforts`/`compat` 通过 pi-ai 校验规则 |
 | `client.smoke.mjs` | jsdom：产物工厂材质化、拦截「推理等级」行、面板渲染、拖动/吸附经 `directory.select` 写入、着色、卸载回收 |
 
 **贡献.** Fork → 修改 → `pnpm build` → 跑 `pnpm test` → 向 `main` 开 PR。小修复（文档、测试）无需事先讨论；报告问题时附 DSH 版本与具体报错。

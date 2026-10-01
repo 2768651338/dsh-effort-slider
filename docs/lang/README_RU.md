@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.3.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.4.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -36,6 +36,8 @@
 
 ---
 
+> 🆕 **v0.4.0** — Портировано на DSH **0.2.0**: DSH заменил свой сервис settings на `SettingsForms` (настройки теперь — конфигурации profile entry; `installSection` / `settings.get` / `settings/updated` удалены). Хост-часть теперь находит profile entry pi-ai (`llm-pi-ai`), читает её через `settings.describe()`, пишет через `settings.mutate()` и слушает `settings/document-updated`. Клиентская часть выводит текущую сессию из `retainedBy.mainView` (`SessionListState.current` удалён). Опции плагина (`enabled` / `defaultDialect` / `routes`) живут в конфигурации entry плагина, редактируются на странице настроек DSH. DSH ≤ 0.1.5 больше не поддерживается (там используйте v0.3.0).
+>
 > 🆕 **v0.3.0** — Портировано на DSH 0.1.5: клиентский `Context` берётся из `@deepseek-ai/cordis`, состояние сессии читается/пишется через `ctx.modelDirectories`, секция настроек устанавливается через `settings.installSection()`; ставшая невозможной обёртка метаданных адаптеров удалена (см. «Универсальное предоставление усилий»). DSH ≤ 0.1.1 больше не поддерживается.
 >
 > 🔧 **v0.2.5** — Исправлено: универсальное предоставление молча не срабатывало на явных массивах `models` (path-операции dsh-settings не умеют обходить узлы-массивы — теперь массив заменяется целиком).
@@ -94,10 +96,10 @@
 
 | Пункт | Значение |
 | --- | --- |
-| Версия DSH | **0.1.5-rc.1** (dist-tag npm `latest`; версия, под которую проверена эта сборка), веб-профиль на Windows |
-| Не работает на | DSH ≤ 0.1.1 — v0.2.5 и ранее импортируют `@deepseek-ai/dsh-client-runtime`, удалённый после 0.1.1-rc.2 |
+| Версия DSH | **0.2.0-rc.2** (dist-tag npm `latest`; версия, под которую проверена эта сборка), веб-профиль на Windows |
+| Не работает на | DSH ≤ 0.1.5 — v0.4.0 нацелена на сервис settings `SettingsForms`, появившийся в 0.2.0 (для DSH 0.1.5 используйте v0.3.0; v0.2.5 и ранее также импортируют `@deepseek-ai/dsh-client-runtime`, удалённый после 0.1.1-rc.2) |
 | Механизм установки | `dsh plugin --profile web add` (патч бандла + две половины) |
-| Зависимости | `ctx.sessions` (`@deepseek-ai/dsh-api-session-controller`) и `ctx.modelDirectories` (`@deepseek-ai/dsh-client-ui-model-selection`); хост: `ctx.llm`, `ctx.settings` |
+| Зависимости | `ctx.sessions` (`@deepseek-ai/dsh-api-session-controller`) и `ctx.modelDirectories` (`@deepseek-ai/dsh-client-ui-model-selection`); хост: `ctx.llm`, `ctx.settings` (`SettingsForms`) |
 | Модульные запросы клиента | никаких сверх базовой платформы (`react`, `react-dom/client`, `react/jsx-runtime`) — все импорты DSH типовые и стираются при сборке |
 
 ## Установка / Удаление
@@ -134,7 +136,7 @@ dsh plugin --profile web add file:./dsh-effort-slider
 
 | Пункт | Подробности |
 | --- | --- |
-| Опции плагина | секция настроек `effort-slider` (пишется в `~/.dsh/settings.yaml`, применяется на лету) |
+| Опции плагина | конфигурация profile entry плагина (`enabled` / `defaultDialect` / `routes`), редактируется на странице настроек DSH (автоматически сгенерированная форма), применяется при перемонтировании плагина |
 | Значения по умолчанию | `enabled: true`, `defaultDialect: effort` |
 | Переменные окружения | своих нет; следует разрешению `DSH_HOME` в DSH |
 | Чувствительные данные | нет — ключи, токены и учётные данные не читаются и не сохраняются |
@@ -160,7 +162,7 @@ effort-slider:
 
 | Половина | Файл | Роль |
 | --- | --- | --- |
-| Хост | `lib/index.js` | Универсальное предоставление усилий: сетевые патчи pi-ai (`buildProvisionOps`, идемпотентно, уважает объявления пользователя) + секция настроек `effort-slider`, устанавливаемая через `settings.installSection`; слушает `llm/adapters-updated` / `settings/updated` для применения на лету |
+| Хост | `lib/index.js` | Универсальное предоставление усилий: находит profile entry pi-ai (`llm-pi-ai`), читает её через `settings.describe()`, дописывает сетевые диалекты через `settings.mutate` (`buildProvisionOps`, идемпотентно, уважает объявления пользователя); слушает `llm/adapters-updated` / `settings/document-updated` |
 | Браузер | `lib/client.js` | Перехватывает клики по строке Effort меню моделей → показывает панель Effort; читает `ctx.modelDirectories.directoryFor(sessionId)` и пишет через `directory.select({ reasoningEffort })`; MutationObserver поддерживает цвет уровня на строке меню после закрытия панели |
 
 > Браузерная часть следует официальной конвенции внешних плагинов: классический скрипт + фабрика `window.__ModuleLoader__.load`; `react` / `react-dom/client` / `react/jsx-runtime` — платформенные externals; `effort.module.css` хешируется и встраивается lightningcss, инъекция как `<style data-plugin>` при запуске фабрики.
@@ -169,7 +171,7 @@ effort-slider:
 
 | Симптом | Решение |
 | --- | --- |
-| В меню моделей нет строки Effort | Модель не объявляет метаданные рассуждений, и предоставление на хосте не действует — убедитесь, что DSH перезапускался, и проверьте `effort-slider.enabled` в `~/.dsh/settings.yaml` |
+| В меню моделей нет строки Effort | Модель не объявляет метаданные рассуждений, и предоставление на хосте не действует — убедитесь, что DSH перезапускался, и проверьте `enabled` на странице настроек плагина (его конфигурация profile entry) |
 | Панель пишет 「当前模型不支持思考强度调节」 | Универсальный резерв не активен — обновитесь до v0.2.0+ и перезапустите |
 | Плагин вообще не загружается (строка помечена `disabled: true`) | Ранняя сборка была выключена в `~/.dsh/profiles/web/cordis.patch.yml`; удалите эту строку и перезапустите |
 | Перетаскивание не действует | Проверьте, совпадает ли сетевой диалект целевого эндпоинта (см. таблицу диалектов), или задайте `defaultDialect` для этого маршрута |
@@ -181,7 +183,7 @@ effort-slider:
 
 ```text
 src/
-  index.ts                  хост-половина: сетевое предоставление pi-ai + секция настроек
+  index.ts                  хост-половина: сетевое предоставление pi-ai через шов SettingsForms
   effort-core.ts             чистая логика: сетевой диалект → маппинг, генерация патчей предоставления (юнит-тесты)
   client/
     index.ts                браузерная половина: перехват строки Effort + якорь панели + раскраска строки меню
@@ -203,7 +205,7 @@ test/                      юнит-тесты host.spec.mjs + host-apply.spec.m
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js (хост-половина) + lib/client.js (браузерная половина)
-pnpm typecheck   # tsc --noEmit (зелёный против @deepseek-ai/* 0.1.5-rc.1)
+pnpm typecheck   # tsc --noEmit (зелёный против @deepseek-ai/* 0.2.0-rc.2)
 pnpm test        # юнит-тесты хоста + интеграция apply + интеграция реального шва + jsdom-дым
 ```
 
@@ -212,8 +214,8 @@ pnpm test        # юнит-тесты хоста + интеграция apply +
 | Файл | Охват |
 | --- | --- |
 | `host.spec.mjs` | Чистая логика: сетевой диалект → маппинг, генерация патчей предоставления, идемпотентность |
-| `host-apply.spec.mjs` | `apply()` на замоканном cordis-контексте: повтор при поздней регистрации секции pi-ai, гейтинг `compat` по объявленному протоколу |
-| `host-integration.spec.mjs` | **Реальный шов**: настоящий `@deepseek-ai/cordis` + настоящий провайдер `@deepseek-ai/dsh-settings-file` — регистрация `installSection`, реальные записи path-op в документ настроек, и записанные `reasoningEfforts`/`compat` проходят правила валидации pi-ai |
+| `host-apply.spec.mjs` | `apply()` на замоканном cordis-контексте: повтор при поздней регистрации entry pi-ai, гейтинг `compat` по объявленному протоколу, идемпотентность `settings/document-updated` |
+| `host-integration.spec.mjs` | **Реальный шов**: настоящий `@deepseek-ai/cordis` + верный дубль шва `SettingsForms` (в npm-пакетах 0.2.0 нет отдельного провайдера) — обнаружение entry, реальные записи path-op, попадающие в конфигурацию profile entry, и записанные `reasoningEfforts`/`compat` проходят правила валидации pi-ai |
 | `client.smoke.mjs` | jsdom: материализация фабрики бандла, перехват строки Effort, рендер панели, записи drag/snap через `directory.select`, раскраска, уборка при размонтировании |
 
 **Вклад.** Fork → изменить → `pnpm build` → запустить `pnpm test` → открыть PR в `main`. Мелкие правки (документация, тесты) приветствуются без предварительного обсуждения; в issues указывайте версию DSH и точный текст ошибки.

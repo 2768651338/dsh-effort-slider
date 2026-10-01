@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.3.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.4.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -36,6 +36,8 @@
 
 ---
 
+> 🆕 **v0.4.0** — DSH **0.2.0** 대응: DSH가 settings 서비스를 `SettingsForms`로 대체했습니다（설정은 이제 profile entry 설정이며, `installSection` / `settings.get` / `settings/updated`는 삭제됨）. 호스트 측은 pi-ai의 profile entry（`llm-pi-ai`）를 찾아 `settings.describe()`로 읽고 `settings.mutate()`로 쓰며, `settings/document-updated`를 구독합니다. 클라이언트 측은 `retainedBy.mainView`에서 현재 세션을 도출합니다（`SessionListState.current`는 삭제됨）. 플러그인 옵션（`enabled` / `defaultDialect` / `routes`）는 플러그인의 entry 설정에 있으며 DSH 설정 페이지에서 편집할 수 있습니다. DSH ≤ 0.1.5는 미지원（해당 버전에서는 v0.3.0 사용）.
+>
 > 🆕 **v0.3.0** — DSH 0.1.5 대응: 클라이언트 `Context`는 `@deepseek-ai/cordis`에서 가져오고, 세션 상태는 `ctx.modelDirectories`로 읽고 쓰며, 설정 섹션은 `settings.installSection()`으로 설치합니다. 더 이상 불가능해진 어댑터 메타데이터 래퍼는 삭제（아래 「범용 에포트 프로비저닝」 참조). DSH ≤ 0.1.1은 미지원.
 >
 > 🔧 **v0.2.5** — 명시적 `models` 배열에서 범용 프로비저닝이 조용히 실패하던 문제 수정（dsh-settings path 연산은 배열 노드를 순회할 수 없음 → 배열째 교체 방식으로 변경）.
@@ -94,10 +96,10 @@
 
 | 항목 | 값 |
 | --- | --- |
-| DSH 버전 | **0.1.5-rc.1**（npm `latest` dist-tag, 이 빌드가 검증한 버전）, Windows의 web 프로필 |
-| 미지원 | DSH ≤ 0.1.1 — v0.2.5 이하는 `@deepseek-ai/dsh-client-runtime`을 import하며 이 패키지는 0.1.1-rc.2 이후 제거됨 |
+| DSH 버전 | **0.2.0-rc.2**（npm `latest` dist-tag, 이 빌드가 검증한 버전）, Windows의 web 프로필 |
+| 미지원 | DSH ≤ 0.1.5 — v0.4.0은 0.2.0에서 도입된 `SettingsForms` settings 서비스를 대상으로 함（DSH 0.1.5에는 v0.3.0 사용. v0.2.5 이하는 추가로 `@deepseek-ai/dsh-client-runtime`을 import하며 이 패키지는 0.1.1-rc.2 이후 제거됨） |
 | 설치 방식 | `dsh plugin --profile web add`（번들 패치 + 호스트/브라우저 더블 하프） |
-| 의존 | `ctx.sessions`（`@deepseek-ai/dsh-api-session-controller`）와 `ctx.modelDirectories`（`@deepseek-ai/dsh-client-ui-model-selection`）. 호스트: `ctx.llm`, `ctx.settings` |
+| 의존 | `ctx.sessions`（`@deepseek-ai/dsh-api-session-controller`）와 `ctx.modelDirectories`（`@deepseek-ai/dsh-client-ui-model-selection`）. 호스트: `ctx.llm`, `ctx.settings`（`SettingsForms`） |
 | 클라이언트 모듈 요청 | 플랫폼 기반（`react` / `react-dom/client` / `react/jsx-runtime`） 외 없음 — DSH import은 전부 타입 전용이며 번들 시 소거됨 |
 
 ## 설치 / 제거
@@ -134,7 +136,7 @@ DevTools Console에 `[effort-slider] intercept row: ...`가 보이면 인터셉�
 
 | 항목 | 내용 |
 | --- | --- |
-| 플러그인 옵션 | `effort-slider` 설정 섹션（`~/.dsh/settings.yaml`에 기록, 핫 적용） |
+| 플러그인 옵션 | 플러그인의 profile entry 설정（`enabled` / `defaultDialect` / `routes`）. DSH 설정 페이지（자동 생성 폼）에서 편집하며 플러그인 리마운트 시 적용 |
 | 기본값 | `enabled: true`, `defaultDialect: effort` |
 | 환경 변수 | 자체 변수 없음 — DSH의 `DSH_HOME` 해석을 따름 |
 | 민감 항목 | 없음 — 키/토큰/자격 증명을 읽거나 저장하지 않음 |
@@ -160,7 +162,7 @@ effort-slider:
 
 | 측 | 파일 | 역할 |
 | --- | --- | --- |
-| 호스트 | `lib/index.js` | 범용 에포트 프로비저닝: pi-ai 와이어 패치（`buildProvisionOps`, 멱등, 사용자 선언 존중） + `settings.installSection`으로 설치되는 `effort-slider` 설정 섹션. `llm/adapters-updated` / `settings/updated`를 구독해 핫 적용 |
+| 호스트 | `lib/index.js` | 범용 에포트 프로비저닝: pi-ai의 profile entry（`llm-pi-ai`）를 찾아 `settings.describe()`로 읽고 `settings.mutate`로 와이어 다이얼렉트를 보완（`buildProvisionOps`, 멱등, 사용자 선언 존중）. `llm/adapters-updated` / `settings/document-updated`를 구독 |
 | 브라우저 | `lib/client.js` | 모델 메뉴의 Effort 행 클릭을 캡처 → Effort 패널 표시. `ctx.modelDirectories.directoryFor(sessionId)`로 읽고 `directory.select({ reasoningEffort })`로 기록. 패널이 닫힌 후엔 MutationObserver가 메뉴 행 단계 색을 지킴 |
 
 > 브라우저 측은 공식 외부 플러그인 관례를 따릅니다: 클래식 스크립트 + `window.__ModuleLoader__.load` 팩토리. `react` / `react-dom/client` / `react/jsx-runtime`은 플랫폼 externals. `effort.module.css`는 lightningcss가 클래스명을 해싱해 인라인하고, 팩토리 실행 시 `<style data-plugin>`으로 주입합니다.
@@ -169,7 +171,7 @@ effort-slider:
 
 | 증상 | 해결 |
 | --- | --- |
-| 모델 메뉴에 Effort 행이 없음 | 모델이 reasoning 메타데이터를 선언하지 않았고 호스트 프로비저닝도 작동하지 않음 — DSH 재시작을 확인하고 `~/.dsh/settings.yaml`의 `effort-slider.enabled` 확인 |
+| 모델 메뉴에 Effort 행이 없음 | 모델이 reasoning 메타데이터를 선언하지 않았고 호스트 프로비저닝도 작동하지 않음 — DSH 재시작을 확인하고 플러그인 설정 페이지（그 profile entry 설정）에서 `enabled` 확인 |
 | 패널에 「当前模型不支持思考强度调节」표시 | 범용 폴백 미작동 — v0.2.0+로 업그레이드 후 재시작 |
 | 플러그인이 아예 로드되지 않음（행이 `disabled: true`） | 이전 빌드가 `~/.dsh/profiles/web/cordis.patch.yml`에서 꺼져 있었음. 해당 행 삭제 후 재시작 |
 | 드래그해도 효과 없음 | 대상 엔드포인트의 와이어 다이얼렉트가 맞는지 확인（다이얼렉트 표 참조）하거나 해당 라우트에 `defaultDialect` 명시 |
@@ -181,7 +183,7 @@ effort-slider:
 
 ```text
 src/
-  index.ts                  호스트 측: pi-ai 와이어 프로비저닝 + 설정 섹션
+  index.ts                  호스트 측: SettingsForms 이음세 경유 pi-ai 와이어 프로비저닝
   effort-core.ts             순수 로직: 다이얼렉트 → 와이어 매핑, 프로비저닝 패치 생성（단위 테스트됨）
   client/
     index.ts                브라우저 측: 모델 메뉴 Effort 행 인터셉트 + 패널 앵커 + 메뉴 행 색칠
@@ -203,7 +205,7 @@ test/                      host.spec.mjs 호스트 단위 + host-apply.spec.mjs 
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js（호스트 측） + lib/client.js（브라우저 측）
-pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.1.5-rc.1 기준 그린）
+pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.2.0-rc.2 기준 그린）
 pnpm test        # 호스트 단위 + apply 통합 + 실제 이음세 통합 + jsdom 스모크
 ```
 
@@ -212,8 +214,8 @@ pnpm test        # 호스트 단위 + apply 통합 + 실제 이음세 통합 + j
 | 파일 | 커버 범위 |
 | --- | --- |
 | `host.spec.mjs` | 순수 로직: 다이얼렉트 → 와이어 매핑, 프로비저닝 패치 생성, 멱등성 |
-| `host-apply.spec.mjs` | mock cordis 컨텍스트에서의 `apply()`: pi-ai 설정 섹션 지연 등록 재시도, 선언된 프로토콜에 따른 `compat` 게이팅 |
-| `host-integration.spec.mjs` | **실제 이음세**: 실제 `@deepseek-ai/cordis` + 실제 `@deepseek-ai/dsh-settings-file` 프로바이더 — `installSection` 등록, 실제 path-op 기록, 기록된 `reasoningEfforts`/`compat`가 pi-ai 검증 규칙 통과 |
+| `host-apply.spec.mjs` | mock cordis 컨텍스트에서의 `apply()`: pi-ai entry 지연 등록 재시도, 선언된 프로토콜에 따른 `compat` 게이팅, `settings/document-updated` 멱등성 |
+| `host-integration.spec.mjs` | **실제 이음세**: 실제 `@deepseek-ai/cordis` + 충실한 `SettingsForms` 이음세 테스트 더블（0.2.0의 npm 패키지에는 독립 프로바이더가 없음）— entry 탐색, 실제 path-op의 profile entry 설정 기록, 기록된 `reasoningEfforts`/`compat`가 pi-ai 검증 규칙 통과 |
 | `client.smoke.mjs` | jsdom: 번들 팩토리 실체화, Effort 행 인터셉트, 패널 렌더, `directory.select` 경유 드래그/스냅 기록, 색칠, 언마운트 회수 |
 
 **기여.** Fork → 수정 → `pnpm build` → `pnpm test` 실행 → `main`으로 PR. 사소한 수정（문서, 테스트）은 사전 협의 없이 환영합니다. 이슈에는 DSH 버전과 구체적 오류를 첨부하세요.

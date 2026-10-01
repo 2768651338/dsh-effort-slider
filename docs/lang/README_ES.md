@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.3.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.4.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -36,6 +36,8 @@ Haz clic en la fila **Effort** (segunda fila del menú de modelos oficial) en lu
 
 ---
 
+> 🆕 **v0.4.0** — Portado a DSH **0.2.0**: DSH sustituyó su servicio de settings por `SettingsForms` (los ajustes son ahora configuraciones de profile entry; `installSection` / `settings.get` / `settings/updated` desaparecieron). La parte host ahora localiza la profile entry de pi-ai (`llm-pi-ai`), la lee vía `settings.describe()`, escribe vía `settings.mutate()` y escucha `settings/document-updated`. La parte cliente deriva la sesión actual de `retainedBy.mainView` (`SessionListState.current` fue eliminado). Las opciones del plugin (`enabled` / `defaultDialect` / `routes`) viven en la configuración de la entry del plugin, editables en la página de ajustes de DSH. DSH ≤ 0.1.5 ya no es compatible (usa ahí la v0.3.0).
+>
 > 🆕 **v0.3.0** — Portado a DSH 0.1.5: el `Context` del cliente viene ahora de `@deepseek-ai/cordis`, el estado por sesión se lee/escribe vía `ctx.modelDirectories` y la sección de ajustes se instala vía `settings.installSection()`; el envoltorio de metadatos de adaptadores fue eliminado (ver «Ajuste universal de esfuerzo»). DSH ≤ 0.1.1 ya no es compatible.
 >
 > 🔧 **v0.2.5** — Corregido el fallo silencioso del aprovisionamiento universal con arrays `models` explícitos (las operaciones path de dsh-settings no pueden atravesar nodos de array — ahora el array se reemplaza como un todo).
@@ -94,10 +96,10 @@ Dialectos de cable admitidos para endpoints personalizados (configura `effort-sl
 
 | Elemento | Valor |
 | --- | --- |
-| Versión de DSH | **0.1.5-rc.1** (el dist-tag `latest` de npm; la versión contra la que se verificó esta compilación), perfil web en Windows |
-| No funciona en | DSH ≤ 0.1.1 — la v0.2.5 y anteriores importan `@deepseek-ai/dsh-client-runtime`, eliminado tras 0.1.1-rc.2 |
+| Versión de DSH | **0.2.0-rc.2** (el dist-tag `latest` de npm; la versión contra la que se verificó esta compilación), perfil web en Windows |
+| No funciona en | DSH ≤ 0.1.5 — la v0.4.0 apunta al servicio de settings `SettingsForms` introducido en 0.2.0 (usa la v0.3.0 para DSH 0.1.5; la v0.2.5 y anteriores también importan `@deepseek-ai/dsh-client-runtime`, eliminado tras 0.1.1-rc.2) |
 | Mecanismo de instalación | `dsh plugin --profile web add` (parche de bundle + doble mitad) |
-| Depende de | `ctx.sessions` (`@deepseek-ai/dsh-api-session-controller`) y `ctx.modelDirectories` (`@deepseek-ai/dsh-client-ui-model-selection`); host: `ctx.llm`, `ctx.settings` |
+| Depende de | `ctx.sessions` (`@deepseek-ai/dsh-api-session-controller`) y `ctx.modelDirectories` (`@deepseek-ai/dsh-client-ui-model-selection`); host: `ctx.llm`, `ctx.settings` (`SettingsForms`) |
 | Peticiones de módulos del cliente | ninguna más allá de la base de la plataforma (`react`, `react-dom/client`, `react/jsx-runtime`) — todos los import de DSH son solo de tipos y se eliminan al empaquetar |
 
 ## Instalación / Desinstalación
@@ -134,7 +136,7 @@ Una línea `[effort-slider] intercept row: ...` en la Consola de DevTools signif
 
 | Elemento | Detalles |
 | --- | --- |
-| Opciones del plugin | sección de ajustes `effort-slider` (escrita en `~/.dsh/settings.yaml`, aplicada en caliente) |
+| Opciones del plugin | la configuración de profile entry del plugin (`enabled` / `defaultDialect` / `routes`), editable en la página de ajustes de DSH (formulario generado automáticamente), aplicada al remontar el plugin |
 | Valores por defecto | `enabled: true`, `defaultDialect: effort` |
 | Variables de entorno | ninguna propia; sigue la resolución de `DSH_HOME` de DSH |
 | Elementos sensibles | ninguno — no se leen ni almacenan claves, tokens ni credenciales |
@@ -160,7 +162,7 @@ effort-slider:
 
 | Mitad | Archivo | Función |
 | --- | --- | --- |
-| Host | `lib/index.js` | Aprovisionamiento universal de esfuerzo: parches de cable pi-ai (`buildProvisionOps`, idempotente, respeta las declaraciones del usuario) + la sección de ajustes `effort-slider` instalada vía `settings.installSection`; escucha `llm/adapters-updated` / `settings/updated` para aplicarse en caliente |
+| Host | `lib/index.js` | Aprovisionamiento universal de esfuerzo: localiza la profile entry de pi-ai (`llm-pi-ai`), la lee vía `settings.describe()`, parchea los dialectos de cable vía `settings.mutate` (`buildProvisionOps`, idempotente, respeta las declaraciones del usuario); escucha `llm/adapters-updated` / `settings/document-updated` |
 | Navegador | `lib/client.js` | Captura los clics en la fila Effort del menú de modelos → muestra el panel Effort; lee `ctx.modelDirectories.directoryFor(sessionId)` y escribe con `directory.select({ reasoningEffort })`; un MutationObserver mantiene vivo el color de nivel de la fila del menú tras cerrar el panel |
 
 > La parte del navegador sigue la convención oficial de plugins externos: script clásico + factoría `window.__ModuleLoader__.load`; `react` / `react-dom/client` / `react/jsx-runtime` son externals de plataforma; `effort.module.css` se hashea e incrusta con lightningcss, inyectado como `<style data-plugin>` cuando se ejecuta la factoría.
@@ -169,7 +171,7 @@ effort-slider:
 
 | Síntoma | Solución |
 | --- | --- |
-| No hay fila Effort en el menú de modelos | El modelo no declara metadatos de razonamiento y el aprovisionamiento del host no actúa — confirma que reiniciaste DSH y revisa `effort-slider.enabled` en `~/.dsh/settings.yaml` |
+| No hay fila Effort en el menú de modelos | El modelo no declara metadatos de razonamiento y el aprovisionamiento del host no actúa — confirma que reiniciaste DSH y revisa `enabled` en la página de ajustes del plugin (su configuración de profile entry) |
 | El panel dice 「当前模型不支持思考强度调节」 | El respaldo universal no está activo — actualiza a v0.2.0+ y reinicia |
 | El plugin no carga en absoluto (la fila muestra `disabled: true`) | Una compilación anterior quedó desactivada en `~/.dsh/profiles/web/cordis.patch.yml`; borra esa fila y reinicia |
 | Arrastrar no tiene efecto | Comprueba si el dialecto de cable del endpoint coincide (ver tabla de dialectos) o fija `defaultDialect` para esa ruta |
@@ -181,7 +183,7 @@ effort-slider:
 
 ```text
 src/
-  index.ts                  mitad host: aprovisionamiento de cable pi-ai + sección de ajustes
+  index.ts                  mitad host: aprovisionamiento de cable pi-ai vía la costura de SettingsForms
   effort-core.ts             lógica pura: mapeo dialecto → cable, generación de parches de aprovisionamiento (testeada)
   client/
     index.ts                mitad navegador: intercepción de la fila Effort + ancla del panel + coloreado de la fila del menú
@@ -203,7 +205,7 @@ test/                      pruebas unitarias host.spec.mjs + host-apply.spec.mjs
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js (mitad host) + lib/client.js (mitad navegador)
-pnpm typecheck   # tsc --noEmit (en verde contra @deepseek-ai/* 0.1.5-rc.1)
+pnpm typecheck   # tsc --noEmit (en verde contra @deepseek-ai/* 0.2.0-rc.2)
 pnpm test        # unitarias del host + integración apply + integración de costura real + smoke jsdom
 ```
 
@@ -212,8 +214,8 @@ Capas de `test/`, de la más barata a la más costosa:
 | Archivo | Alcance |
 | --- | --- |
 | `host.spec.mjs` | Lógica pura: mapeo dialecto → cable, generación de parches de aprovisionamiento, idempotencia |
-| `host-apply.spec.mjs` | `apply()` contra un contexto cordis simulado: reintento por registro tardío de la sección pi-ai, control de `compat` según el protocolo declarado |
-| `host-integration.spec.mjs` | **Costura real**: `@deepseek-ai/cordis` real + proveedor `@deepseek-ai/dsh-settings-file` real — registro de `installSection`, escrituras path-op reales aterrizando en un documento de ajustes, y el `reasoningEfforts`/`compat` escrito pasando las reglas de validación de pi-ai |
+| `host-apply.spec.mjs` | `apply()` contra un contexto cordis simulado: reintento por registro tardío de la entry de pi-ai, control de `compat` según el protocolo declarado, idempotencia de `settings/document-updated` |
+| `host-integration.spec.mjs` | **Costura real**: `@deepseek-ai/cordis` real + un doble fiel de la costura `SettingsForms` (los paquetes npm de 0.2.0 no tienen proveedor independiente) — descubrimiento de la entry, escrituras path-op reales aterrizando en la configuración de profile entry, y el `reasoningEfforts`/`compat` escrito pasando las reglas de validación de pi-ai |
 | `client.smoke.mjs` | jsdom: materialización de la factoría del bundle, intercepción de la fila Effort, render del panel, escrituras de arrastre/ajuste vía `directory.select`, coloreado, limpieza al desmontar |
 
 **Contribuir.** Fork → cambiar → `pnpm build` → ejecutar `pnpm test` → abrir un PR contra `main`. Los arreglos pequeños (documentación, pruebas) son bienvenidos sin discusión previa; reporta issues con la versión de DSH y el error exacto.

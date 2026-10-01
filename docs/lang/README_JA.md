@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.3.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.4.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -36,6 +36,8 @@
 
 ---
 
+> 🆕 **v0.4.0** — DSH **0.2.0** へ移植：DSH は settings サービスを `SettingsForms` に置き換えました（設定は profile entry 設定になり、`installSection` / `settings.get` / `settings/updated` は廃止）。ホスト側は pi-ai の profile entry（`llm-pi-ai`）を特定し、`settings.describe()` で読み取り、`settings.mutate()` で書き込み、`settings/document-updated` を監視します。クライアント側は `retainedBy.mainView` から現在のセッションを導出します（`SessionListState.current` は削除済み）。プラグインオプション（`enabled` / `defaultDialect` / `routes`）はプラグインの entry 設定に置かれ、DSH の設定ページで編集できます。DSH ≤ 0.1.5 はサポート外（そちらでは v0.3.0 を使用）。
+>
 > 🆕 **v0.3.0** — DSH 0.1.5 へ移植：クライアントの `Context` は `@deepseek-ai/cordis` から取得、セッション状態は `ctx.modelDirectories` 経由で読み書き、設定セクションは `settings.installSection()` でインストール。不可能になったアダプターメタデータラッパーは削除（下記「汎用エフォート供給」参照）。DSH ≤ 0.1.1 はサポート外に。
 >
 > 🔧 **v0.2.5** — 明示的な `models` 配列で汎用プロビジョニングが静かに失敗する問題を修正（dsh-settings の path 操作は配列ノードを走査できないため、配列ごと置き換える方式に変更）。
@@ -94,10 +96,10 @@
 
 | 項目 | 値 |
 | --- | --- |
-| DSH バージョン | **0.1.5-rc.1**（npm `latest` dist-tag。このビルドが検証対象としたバージョン）、Windows の web プロファイル |
-| 動作しない | DSH ≤ 0.1.1 — v0.2.5 以前は `@deepseek-ai/dsh-client-runtime` を import しますが、このパッケージは 0.1.1-rc.2 以降に削除されました |
+| DSH バージョン | **0.2.0-rc.2**（npm `latest` dist-tag。このビルドが検証対象としたバージョン）、Windows の web プロファイル |
+| 動作しない | DSH ≤ 0.1.5 — v0.4.0 は 0.2.0 で導入された `SettingsForms` settings サービスを対象とします（DSH 0.1.5 には v0.3.0 を使用。v0.2.5 以前はさらに `@deepseek-ai/dsh-client-runtime` を import しますが、このパッケージは 0.1.1-rc.2 以降に削除されました） |
 | インストール機構 | `dsh plugin --profile web add`（バンドルパッチ + ホスト/ブラウザの 2 半区） |
-| 依存 | `ctx.sessions`（`@deepseek-ai/dsh-api-session-controller`）と `ctx.modelDirectories`（`@deepseek-ai/dsh-client-ui-model-selection`）。ホスト側：`ctx.llm`、`ctx.settings` |
+| 依存 | `ctx.sessions`（`@deepseek-ai/dsh-api-session-controller`）と `ctx.modelDirectories`（`@deepseek-ai/dsh-client-ui-model-selection`）。ホスト側：`ctx.llm`、`ctx.settings`（`SettingsForms`） |
 | クライアントのモジュール要求 | プラットフォーム基盤（`react` / `react-dom/client` / `react/jsx-runtime`）以外なし — DSH の import はすべて型のみで、バンドル時に消去されます |
 
 ## インストール / アンインストール
@@ -134,7 +136,7 @@ DevTools Console に `[effort-slider] intercept row: ...` と出ればインタ�
 
 | 項目 | 詳細 |
 | --- | --- |
-| プラグインオプション | `effort-slider` 設定セクション（`~/.dsh/settings.yaml` に書き込まれ、ホット適用） |
+| プラグインオプション | プラグインの profile entry 設定（`enabled` / `defaultDialect` / `routes`）。DSH の設定ページ（自動生成フォーム）で編集でき、プラグインの再マウント時に適用 |
 | 既定値 | `enabled: true`、`defaultDialect: effort` |
 | 環境変数 | 自前のものなし。DSH の `DSH_HOME` 解決に従う |
 | 機密項目 | なし — キー/トークン/資格情報は読み取りも保存もしません |
@@ -160,7 +162,7 @@ effort-slider:
 
 | 半区 | ファイル | 役割 |
 | --- | --- | --- |
-| ホスト | `lib/index.js` | 汎用エフォート供給：pi-ai ワイヤパッチ（`buildProvisionOps`、冪等、ユーザー宣言を尊重）+ `settings.installSection` でインストールされる `effort-slider` 設定セクション。`llm/adapters-updated` / `settings/updated` を監視してホット適用 |
+| ホスト | `lib/index.js` | 汎用エフォート供給：pi-ai の profile entry（`llm-pi-ai`）を特定し、`settings.describe()` で読み取り、`settings.mutate` でワイヤ方言を補完（`buildProvisionOps`、冪等、ユーザー宣言を尊重）。`llm/adapters-updated` / `settings/document-updated` を監視 |
 | ブラウザ | `lib/client.js` | モデルメニューの Effort 行のクリックをキャプチャ → Effort パネルを表示。`ctx.modelDirectories.directoryFor(sessionId)` で読み取り、`directory.select({ reasoningEffort })` で書き込み。パネルを閉じた後は MutationObserver がメニュー行のレベル色を守ります |
 
 > ブラウザ側は公式の外部プラグイン規約に従います：クラシックスクリプト + `window.__ModuleLoader__.load` ファクトリー。`react` / `react-dom/client` / `react/jsx-runtime` はプラットフォーム externals。`effort.module.css` は lightningcss がクラス名をハッシュ化してインライン化し、ファクトリー実行時に `<style data-plugin>` として注入します。
@@ -169,7 +171,7 @@ effort-slider:
 
 | 症状 | 対処 |
 | --- | --- |
-| モデルメニューに Effort 行がない | モデルが reasoning メタデータを宣言しておらず、ホスト供給も効いていません — DSH の再起動を確認し、`~/.dsh/settings.yaml` の `effort-slider.enabled` を確認 |
+| モデルメニューに Effort 行がない | モデルが reasoning メタデータを宣言しておらず、ホスト供給も効いていません — DSH の再起動を確認し、プラグインの設定ページ（その profile entry 設定）で `enabled` を確認 |
 | パネルに「当前模型不支持思考强度调节」と出る | 汎用フォールバックが有効でありません — v0.2.0+ にアップグレードして再起動 |
 | プラグインがまったく読み込まれない（行が `disabled: true`） | 旧ビルドが `~/.dsh/profiles/web/cordis.patch.yml` で無効化されていました。その行を削除して再起動 |
 | ドラッグしても効かない | 対象エンドポイントのワイヤ方言が一致しているか確認（方言表を参照）。またはそのルートに `defaultDialect` を明示設定 |
@@ -181,7 +183,7 @@ effort-slider:
 
 ```text
 src/
-  index.ts                  ホスト半区：pi-ai ワイヤ供給 + 設定セクション
+  index.ts                  ホスト半区：SettingsForms シーム経由の pi-ai ワイヤ供給
   effort-core.ts             純ロジック：方言 → ワイヤマッピング、供給パッチ生成（単体テスト済み）
   client/
     index.ts                ブラウザ半区：モデルメニューの Effort 行インターセプト + パネルアンカー + メニュー行の着色
@@ -203,7 +205,7 @@ test/                      host.spec.mjs ホスト単体 + host-apply.spec.mjs +
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js（ホスト半区）+ lib/client.js（ブラウザ半区）
-pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.1.5-rc.1 に対してグリーン）
+pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.2.0-rc.2 に対してグリーン）
 pnpm test        # ホスト単体 + apply 結合 + リアムシーム結合 + jsdom スモーク
 ```
 
@@ -212,8 +214,8 @@ pnpm test        # ホスト単体 + apply 結合 + リアムシーム結合 + j
 | ファイル | カバー範囲 |
 | --- | --- |
 | `host.spec.mjs` | 純ロジック：方言 → ワイヤマッピング、供給パッチ生成、冪等性 |
-| `host-apply.spec.mjs` | mock cordis コンテキストでの `apply()`：pi-ai 設定セクションの遅延登録リトライ、宣言プロトコルによる `compat` のゲーティング |
-| `host-integration.spec.mjs` | **リアルシーム**：実 `@deepseek-ai/cordis` + 実 `@deepseek-ai/dsh-settings-file` プロバイダー — `installSection` の登録、実 path-op による設定ドキュメントへの書き込み、書き出された `reasoningEfforts`/`compat` が pi-ai の検証ルールを通ること |
+| `host-apply.spec.mjs` | mock cordis コンテキストでの `apply()`：pi-ai entry の遅延登録リトライ、宣言プロトコルによる `compat` のゲーティング、`settings/document-updated` の冪等性 |
+| `host-integration.spec.mjs` | **リアルシーム**：実 `@deepseek-ai/cordis` + 忠実な `SettingsForms` シームのテストダブル（0.2.0 の npm パッケージにスタンドアロンのプロバイダーはない）— entry の発見、実 path-op による profile entry 設定への書き込み、書き出された `reasoningEfforts`/`compat` が pi-ai の検証ルールを通ること |
 | `client.smoke.mjs` | jsdom：バンドルファクトリーの実体化、Effort 行のインターセプト、パネル描画、`directory.select` 経由のドラッグ/スナップ書き込み、着色、アンマウント時の回収 |
 
 **コントリビュート.** Fork → 変更 → `pnpm build` → `pnpm test` を実行 → `main` へ PR。小さな修正（ドキュメント、テスト）は事前相談なしで歓迎します。Issue には DSH バージョンと具体的なエラーを添えてください。

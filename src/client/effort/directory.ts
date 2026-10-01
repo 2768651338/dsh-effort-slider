@@ -7,7 +7,7 @@
  * 这两个直连 RPC（ConnectionHandle 已不暴露 `.api`），而是走
  * `ctx.modelDirectories`（ModelDirectoryResolver）暴露的每会话共享目录：
  * 同一个 store 同时驱动 /model 弹层与输入框上方的模型座位，写入走
- * `directory.select(...)`。
+ * `directory.select(...)`。0.2.0 该面保持不变（store/load/select 同形）。
  */
 
 /** 一档推理等级（宿主目录返回的 effort 条目）。 */
@@ -71,9 +71,46 @@ export interface ModelDirectoriesLike {
   directoryFor(sessionId: string): ModelDirectoryLike
 }
 
+/** 会话目录里的一行（SessionSummary 的结构子集）。 */
+export interface SessionRowLike {
+  id?: string
+  /** 本地持有计数；0.2.0 的 mainView 计数 > 0 即当前主视图会话。 */
+  retainedBy?: Partial<Record<string, number | undefined>>
+}
+
+/** 会话目录快照（SessionListState 的结构子集，兼容 0.1.x / 0.2.0）。 */
+export interface SessionListLike {
+  /** 0.1.x 直出的当前会话 id；0.2.0 起移除。 */
+  current?: string
+  /** 0.2.0 的目录行（键为会话 id）。 */
+  byId?: Record<string, SessionRowLike>
+}
+
 /** `ctx.sessions`（只用到当前会话 id）。 */
 export interface SessionsLike {
-  readonly list: { getSnapshot(): { current?: string } }
+  readonly list: { getSnapshot(): SessionListLike }
+}
+
+/**
+ * 解析当前主视图会话 id。0.1.x 直接读 `list.current`；0.2.0 该字段移除
+ * （「导航归视图所有」），官方 uiSession 以 `retainedBy.mainView > 0`
+ * 判定当前会话，这里跟随同一判定，并保留旧字段兜底。
+ */
+export function currentSessionId(sessions: SessionsLike): string | undefined {
+  let snapshot: SessionListLike
+  try {
+    snapshot = sessions.list.getSnapshot()
+  } catch {
+    return undefined
+  }
+  const direct = snapshot.current
+  if (typeof direct === 'string' && direct.length > 0) return direct
+  for (const [key, row] of Object.entries(snapshot.byId ?? {})) {
+    if ((row?.retainedBy?.mainView ?? 0) > 0) {
+      return typeof row?.id === 'string' && row.id.length > 0 ? row.id : key
+    }
+  }
+  return undefined
 }
 
 /** 安全读取目录快照：目录可能尚未装配完整。 */
