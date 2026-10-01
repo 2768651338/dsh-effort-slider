@@ -1,4 +1,4 @@
-<!-- English version. 中文文档见 docs/lang/README_ZH.md -->
+<!-- English (canonical). Translations in docs/lang/: README_ZH / README_JA / README_ES / README_DE / README_RU / README_PT / README_KO -->
 <div align="center">
 
 # dsh-effort-slider
@@ -14,7 +14,7 @@
 
 <br>
 
-[**中文**](docs/lang/README_ZH.md)
+**English** · [中文](docs/lang/README_ZH.md) · [Español](docs/lang/README_ES.md) · [日本語](docs/lang/README_JA.md) · [Deutsch](docs/lang/README_DE.md) · [Русский](docs/lang/README_RU.md) · [Português](docs/lang/README_PT.md) · [한국어](docs/lang/README_KO.md)
 
 </div>
 

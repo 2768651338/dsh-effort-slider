@@ -1,9 +1,11 @@
-<!-- 中文版。English: [README](../README.md) -->
+<!-- 中文版。English: [README](../../README.md) -->
 <div align="center">
 
-[**English**](../README.md) · **中文**
+[**English**](../../README.md) · **中文** · [Español](README_ES.md) · [日本語](README_JA.md) · [Deutsch](README_DE.md) · [Русский](README_RU.md) · [Português](README_PT.md) · [한국어](README_KO.md)
 
 </div>
+
+> ※ 本文档为英文版的翻译；如有出入以[英文版](../../README.md)为准。欢迎通过 Issue / PR 修正翻译。
 
 <div align="center">
 
@@ -11,7 +13,7 @@
 
 > **仿 Claude Code 推理等级滑块** —— 点击模型菜单「推理等级」，无极拖动、松手吸附、WebGL 火焰跟随；任何第三方模型/提供商的思考强度都真实生效。
 
-[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../LICENSE)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
 [![version](https://img.shields.io/badge/version-v0.3.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
@@ -233,9 +235,9 @@ pnpm test        # 宿主单测 + apply 集成 + 真实接缝集成 + jsdom 冒�
 
 ## 许可证与安全
 
-**许可证**：BSD-3-Clause — 见 [LICENSE](../LICENSE)。
+**许可证**：BSD-3-Clause — 见 [LICENSE](../../LICENSE)。
 界面实现参考了社区 dsh-ui-web 项目的 aurora 皮肤（BSD-3-Clause），完整上游声明与许可证原文见
-[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)。
+[THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md)。
 
 **安全**：本插件不读取任何凭据、不发送任何网络数据（仅与本机 DSH 通信）。安全问题的私下报告请使用
 GitHub Security tab 的 **Report a vulnerability**，勿公开张贴利用细节。
