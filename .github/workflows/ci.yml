@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # 版本取自 package.json 的 packageManager 字段，避免环境漂移。
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      # lib/ 是提交进仓库的构建产物（github: 安装路径直接消费），
+      # 忘记 build 就 push 会把旧产物发给用户——产物不新鲜即失败。
+      - name: lib/ artifacts must be fresh
+        run: git diff --exit-code lib/
