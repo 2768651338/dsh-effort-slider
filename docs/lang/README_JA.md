@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.4.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -36,6 +36,8 @@
 
 ---
 
+> 🆕 **v0.5.0** — 評価修正バッチ。信頼性：パネルは「読み込み中 / 読み込み失敗 / 非対応」を 3 状態に分けて再試行ボタンを付属；スライダーの書き込み失敗時はヘッダー状態が一瞬赤くなり、サイレント失敗しない；供給中のユーザー設定同時編集を検出（`mutate` 前にエントリを再読み込み、競合ラウンドは譲る）；ホスト供給の全失敗パスが警告を記録し、認識できなかった Effort 行は 1 回だけ診断を出力。パネル操作：スクロール/リサイズに追従して再配置、Esc / 外側クリック / アンカーのアンマウントで閉じ、Effort 行の再クリックでトグル；目盛り点とラベルは実際のスナップ位置に整合；スライダーは `aria-label` / `aria-valuetext` を持ち、UI 文言は二言語（zh/en、`<html lang>` に追従）。新オプション `debugReport`：ルート/モデル別の供給詳細に加え、任意の読み取り専用 `llm/stream` トレーサーがリクエストごとに route/model/effort を記録；パネルヘッダーの「?」ヒントは `enabled` / ダイアレクト / `debugReport` の調査手順を指す。その他：GitHub Actions CI（typecheck + テスト + ビルド + 成果物新鮮度ゲート）を追加；パネル表示中でも不可視の WebGL 炎は 60fps で空焼きしない；npm パッケージは `@txc2768651338/dsh-effort-slider` に改名（旧スコープなし名 `dsh-effort-slider` は廃止）。
+>
 > 🆕 **v0.4.0** — DSH **0.2.0** へ移植：DSH は settings サービスを `SettingsForms` に置き換えました（設定は profile entry 設定になり、`installSection` / `settings.get` / `settings/updated` は廃止）。ホスト側は pi-ai の profile entry（`llm-pi-ai`）を特定し、`settings.describe()` で読み取り、`settings.mutate()` で書き込み、`settings/document-updated` を監視します。クライアント側は `retainedBy.mainView` から現在のセッションを導出します（`SessionListState.current` は削除済み）。プラグインオプション（`enabled` / `defaultDialect` / `routes`）はプラグインの entry 設定に置かれ、DSH の設定ページで編集できます。DSH ≤ 0.1.5 はサポート外（そちらでは v0.3.0 を使用）。
 >
 > 🆕 **v0.3.0** — DSH 0.1.5 へ移植：クライアントの `Context` は `@deepseek-ai/cordis` から取得、セッション状態は `ctx.modelDirectories` 経由で読み書き、設定セクションは `settings.installSection()` でインストール。不可能になったアダプターメタデータラッパーは削除（下記「汎用エフォート供給」参照）。DSH ≤ 0.1.1 はサポート外に。
@@ -81,7 +83,8 @@
 
 > **なぜアダプターラッパーがなくなったのか。** v0.2.5 まで、ホスト側は各アダプターの `resolveModel` をラップし、`reasoning` メタデータを宣言しないモデルへ `universalReasoning` を注入していました。DSH 0.1.5 で `llm.adapters` が公開アクセサーのない非公開フィールドになり、この経路は不可能になりました — そして不要にもなりました。`reasoningEfforts` は「リクエストのワイヤ」と「モデルカタログ」の両方に効く唯一の宣言だからです。モデルレベルの `compat` は、ルートが `api: openai-completions` を宣言している場合にのみ書き込まれます。pi-ai は「そのモデルのプロトコルが読めないスイッチ」を拒否するためです。
 
-カスタムエンドポイントで対応するワイヤ方言（`effort-slider.defaultDialect` または `routes.<ルート>` で設定）：
+カスタムエンドポイントで対応するワイヤ方言（`effort-slider.defaultDialect` または `routes.<ルート>` で設定）。方言がレベルを翻訳するのは
+`api: openai-completions` のルートのみで、ネイティブプロトコルは pi-ai の内蔵マッピングを使うため、方言設定はそのワイヤ上で効果を持ちません：
 
 | 方言 | ワイヤ上の効果 |
 | --- | --- |
@@ -105,7 +108,10 @@
 ## インストール / アンインストール
 
 ```sh
-# GitHub からインストール（lib/ のビルド成果物はコミット済み、ローカルビルド不要）
+# npm からインストール（deepseek1024.com のカタログに収録されたパッケージ）
+dsh plugin --profile web add @txc2768651338/dsh-effort-slider
+
+# または GitHub からインストール（lib/ のビルド成果物はコミット済み、ローカルビルド不要）
 dsh plugin --profile web add github:2768651338/dsh-effort-slider#main
 
 # またはローカルでビルドしてチェックアウトからインストール
@@ -120,8 +126,8 @@ dsh plugin --profile web add file:./dsh-effort-slider
 
 | 操作 | コマンド |
 | --- | --- |
-| アップグレード | `dsh plugin --profile web update dsh-effort-slider`（または `add` を再実行）、その後 DSH を再起動 |
-| アンインストール | `dsh plugin --profile web remove dsh-effort-slider`、`cordis.patch.yml` にその行があれば削除 |
+| アップグレード | `dsh plugin --profile web update @txc2768651338/dsh-effort-slider`（または `add` を再実行）、その後 DSH を再起動 |
+| アンインストール | `dsh plugin --profile web remove @txc2768651338/dsh-effort-slider`、`cordis.patch.yml` にその行があれば削除 |
 
 ## クイックスタート
 
@@ -136,8 +142,8 @@ DevTools Console に `[effort-slider] intercept row: ...` と出ればインタ�
 
 | 項目 | 詳細 |
 | --- | --- |
-| プラグインオプション | プラグインの profile entry 設定（`enabled` / `defaultDialect` / `routes`）。DSH の設定ページ（自動生成フォーム）で編集でき、プラグインの再マウント時に適用 |
-| 既定値 | `enabled: true`、`defaultDialect: effort` |
+| プラグインオプション | プラグインの profile entry 設定（`enabled` / `defaultDialect` / `routes` / `debugReport`）。DSH の設定ページ（自動生成フォーム）で編集でき、プラグインの再マウント時に適用 |
+| 既定値 | `enabled: true`、`defaultDialect: effort`、`debugReport: false` |
 | 環境変数 | 自前のものなし。DSH の `DSH_HOME` 解決に従う |
 | 機密項目 | なし — キー/トークン/資格情報は読み取りも保存もしません |
 
@@ -147,6 +153,7 @@ effort-slider:
   defaultDialect: effort # グローバルの既定ワイヤ方言
   routes:
     my-gateway: deepseek # ルートごとの上書き
+  debugReport: false     # 実行ごとの供給レポート（ルート/モデル/方言/書き込み-or-スキップ）+ リクエストごとのエフォート追跡（llm/stream）をホストログへ
 ```
 
 ## 権限とデータ
@@ -162,7 +169,7 @@ effort-slider:
 
 | 半区 | ファイル | 役割 |
 | --- | --- | --- |
-| ホスト | `lib/index.js` | 汎用エフォート供給：pi-ai の profile entry（`llm-pi-ai`）を特定し、`settings.describe()` で読み取り、`settings.mutate` でワイヤ方言を補完（`buildProvisionOps`、冪等、ユーザー宣言を尊重）。`llm/adapters-updated` / `settings/document-updated` を監視 |
+| ホスト | `lib/index.js` | 汎用エフォート供給：pi-ai の profile entry（`llm-pi-ai`）を特定し、`settings.describe()` で読み取り、`settings.mutate` でワイヤ方言を補完（`buildProvisionOps`、冪等、ユーザー宣言を尊重）。`llm/adapters-updated` / `settings/document-updated` を監視。`debugReport: true` では実行ごとの供給がルート/モデルごとのレポート（書き込みフィールドまたはスキップ理由、方言が適用されない箇所の注記つき）を 1 行カウントの代わりに出力し、読み取り専用の `llm/stream` パススルーで各モデル呼び出しを `[debug] request route=… model=… effort=…` として追跡 |
 | ブラウザ | `lib/client.js` | モデルメニューの Effort 行のクリックをキャプチャ → Effort パネルを表示。`ctx.modelDirectories.directoryFor(sessionId)` で読み取り、`directory.select({ reasoningEffort })` で書き込み。パネルを閉じた後は MutationObserver がメニュー行のレベル色を守ります |
 
 > ブラウザ側は公式の外部プラグイン規約に従います：クラシックスクリプト + `window.__ModuleLoader__.load` ファクトリー。`react` / `react-dom/client` / `react/jsx-runtime` はプラットフォーム externals。`effort.module.css` は lightningcss がクラス名をハッシュ化してインライン化し、ファクトリー実行時に `<style data-plugin>` として注入します。
@@ -171,13 +178,13 @@ effort-slider:
 
 | 症状 | 対処 |
 | --- | --- |
-| モデルメニューに Effort 行がない | モデルが reasoning メタデータを宣言しておらず、ホスト供給も効いていません — DSH の再起動を確認し、プラグインの設定ページ（その profile entry 設定）で `enabled` を確認 |
+| モデルメニューに Effort 行がない | モデルが reasoning メタデータを宣言しておらず、ホスト供給も効いていません — DSH の再起動を確認し、プラグインの設定ページ（その profile entry 設定）で `enabled` を確認。`debugReport: true` にしてホストログでモデルごとの供給レポートを確認 |
 | パネルに「当前模型不支持思考强度调节」と出る | 汎用フォールバックが有効でありません — v0.2.0+ にアップグレードして再起動 |
 | プラグインがまったく読み込まれない（行が `disabled: true`） | 旧ビルドが `~/.dsh/profiles/web/cordis.patch.yml` で無効化されていました。その行を削除して再起動 |
-| ドラッグしても効かない | 対象エンドポイントのワイヤ方言が一致しているか確認（方言表を参照）。またはそのルートに `defaultDialect` を明示設定 |
+| ドラッグしても効かない | 対象エンドポイントのワイヤ方言が一致しているか確認（方言表を参照 — 方言は `api: openai-completions` ルートでのみ翻訳）。またはそのルートに `defaultDialect` を明示設定。`debugReport: true` にするとホストログが検証可能なチェーン全体をカバーします：モデルごとのレポートが何を書き込んだ（またはスキップした理由）かを正確に示し、方言が適用されないルートに注記。`[debug] request route=… model=… effort=…` 行が各呼び出しが運ぶレベルを証明。残るは pi-ai 内部のワイヤ翻訳だけで、これはどのプラグインからも観測できません。パネルの `?` ボタンがこのチェックリストを再表示します |
 | 他のスキンプラグインと競合する | Effort 行をインターセプトするスキン（dsh-ui-web 系の aurora など）が同時にインストールされている場合、そのインターセプトを無効化して二重パネルを回避 |
 | 再起動後もバージョンが古いまま | `file:` インストールはスナップショットコピーです — `github:` でインストールするか `add` を再実行してから再起動 |
-| ログはどこに？ | ホスト側のエラー: DSH 起動ログ。クライアント側: ブラウザ DevTools（F12）Console（`[effort-slider]` プレフィックス） |
+| ログはどこに？ | ホスト側のエラー: DSH 起動ログ（`debugReport: true` なら供給の詳細とリクエストごとのエフォート追跡が `effort-slider: [debug]` 行として出力）。クライアント側: ブラウザ DevTools（F12）Console（`[effort-slider]` プレフィックス） |
 
 ## プロジェクト構成
 
@@ -227,6 +234,20 @@ UI 実装はコミュニティ dsh-ui-web プロジェクトの aurora スキン
 [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md) を参照してください。
 
 **セキュリティ**: 本プラグインは資格情報を読まず、ネットワークへ何も送信しません（ローカルの DSH とだけ通信します）。セキュリティ問題の非公開報告は GitHub Security タブの **Report a vulnerability** をご利用ください。悪用の詳細を公開 Issue に書かないでください。
+
+## Star History
+
+<div align="center">
+
+<a href="https://star-history.com/#2768651338/dsh-effort-slider&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=2768651338/dsh-effort-slider&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=2768651338/dsh-effort-slider&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=2768651338/dsh-effort-slider&type=Date" />
+  </picture>
+</a>
+
+</div>
 
 ---
 

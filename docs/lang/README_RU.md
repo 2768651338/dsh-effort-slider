@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.4.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -36,6 +36,8 @@
 
 ---
 
+> 🆕 **v0.5.0** — Пакет исправлений по итогам оценки. Надёжность: панель разделяет «загрузка / ошибка загрузки / не поддерживается» на три состояния с кнопкой повтора; неудачные записи слайдера кратко подсвечивают статус красным вместо тихого сбоя; одновременные правки конфигурации пользователем обнаруживаются (запись перечитывается перед `mutate`, конфликтующие раунды уступают); все пути сбоя провижининга на стороне хоста пишут предупреждение, а ни разу не опознанная строка Effort выдаёт одноразовую диагностику. UX панели: перепозиционируется при прокрутке/изменении окна, закрывается по Esc / клику вне / размонтированию якоря, повторный клик по строке Effort переключает её; точки и подписи шкалы выровнены по реальным точкам прилипания; слайдер несёт `aria-label` / `aria-valuetext`; тексты интерфейса двуязычны (zh/en, по `<html lang>`). Новая опция `debugReport`: детализация провижининга по маршрутам/моделям плюс необязательный read-only трассировщик `llm/stream`, пишущий route/model/effort на каждый запрос; подсказка `?` в шапке панели указывает на `enabled` / диалект / `debugReport`. Также: CI на GitHub Actions (typecheck + тесты + сборка + проверка свежести артефактов), WebGL-огонь больше не горит на 60 fps, когда невидим, а npm-пакет переименован в `@txc2768651338/dsh-effort-slider` (старое имя без scope `dsh-effort-slider` выведено из употребления).
+>
 > 🆕 **v0.4.0** — Портировано на DSH **0.2.0**: DSH заменил свой сервис settings на `SettingsForms` (настройки теперь — конфигурации profile entry; `installSection` / `settings.get` / `settings/updated` удалены). Хост-часть теперь находит profile entry pi-ai (`llm-pi-ai`), читает её через `settings.describe()`, пишет через `settings.mutate()` и слушает `settings/document-updated`. Клиентская часть выводит текущую сессию из `retainedBy.mainView` (`SessionListState.current` удалён). Опции плагина (`enabled` / `defaultDialect` / `routes`) живут в конфигурации entry плагина, редактируются на странице настроек DSH. DSH ≤ 0.1.5 больше не поддерживается (там используйте v0.3.0).
 >
 > 🆕 **v0.3.0** — Портировано на DSH 0.1.5: клиентский `Context` берётся из `@deepseek-ai/cordis`, состояние сессии читается/пишется через `ctx.modelDirectories`, секция настроек устанавливается через `settings.installSection()`; ставшая невозможной обёртка метаданных адаптеров удалена (см. «Универсальное предоставление усилий»). DSH ≤ 0.1.1 больше не поддерживается.
@@ -81,7 +83,9 @@
 
 > **Почему больше нет обёртки адаптеров.** До v0.2.5 хост-часть также оборачивала `resolveModel` каждого адаптера, чтобы внедрять `universalReasoning` в модели без метаданных `reasoning`. В DSH 0.1.5 `llm.adapters` стал приватным полем без публичного акцессора — этот путь стал невозможным, и больше не нужен: `reasoningEfforts` — единственное объявление, которое питает и запрос по сети, и каталог моделей. `compat` на уровне модели записывается только когда маршрут объявляет `api: openai-completions`, потому что pi-ai отвергает переключатель, который протокол модели не может прочитать.
 
-Поддерживаемые сетевые диалекты для сторонних эндпоинтов (задайте `effort-slider.defaultDialect` или `routes.<маршрут>`):
+Поддерживаемые сетевые диалекты для сторонних эндпоинтов (задайте `effort-slider.defaultDialect` или `routes.<маршрут>`).
+Диалект переводит уровни только на маршрутах `api: openai-completions` — нативные протоколы используют встроенное
+сопоставление pi-ai, так что настройка диалекта там на провод не влияет:
 
 | Диалект | Эффект в сети |
 | --- | --- |
@@ -105,7 +109,10 @@
 ## Установка / Удаление
 
 ```sh
-# Установка с GitHub (собранные артефакты lib/ закоммичены, локальная сборка не нужна)
+# Установка из npm (пакет, добавленный в каталог deepseek1024.com)
+dsh plugin --profile web add @txc2768651338/dsh-effort-slider
+
+# Или установка с GitHub (собранные артефакты lib/ закоммичены, локальная сборка не нужна)
 dsh plugin --profile web add github:2768651338/dsh-effort-slider#main
 
 # Или собрать локально и установить из checkout
@@ -120,8 +127,8 @@ dsh plugin --profile web add file:./dsh-effort-slider
 
 | Действие | Команда |
 | --- | --- |
-| Обновление | `dsh plugin --profile web update dsh-effort-slider` (или повторный `add`), затем перезапуск DSH |
-| Удаление | `dsh plugin --profile web remove dsh-effort-slider`, и удалить его строку из `cordis.patch.yml`, если есть |
+| Обновление | `dsh plugin --profile web update @txc2768651338/dsh-effort-slider` (или повторный `add`), затем перезапуск DSH |
+| Удаление | `dsh plugin --profile web remove @txc2768651338/dsh-effort-slider`, и удалить его строку из `cordis.patch.yml`, если есть |
 
 ## Быстрый старт
 
@@ -136,8 +143,8 @@ dsh plugin --profile web add file:./dsh-effort-slider
 
 | Пункт | Подробности |
 | --- | --- |
-| Опции плагина | конфигурация profile entry плагина (`enabled` / `defaultDialect` / `routes`), редактируется на странице настроек DSH (автоматически сгенерированная форма), применяется при перемонтировании плагина |
-| Значения по умолчанию | `enabled: true`, `defaultDialect: effort` |
+| Опции плагина | конфигурация profile entry плагина (`enabled` / `defaultDialect` / `routes` / `debugReport`), редактируется на странице настроек DSH (автоматически сгенерированная форма), применяется при перемонтировании плагина |
+| Значения по умолчанию | `enabled: true`, `defaultDialect: effort`, `debugReport: false` |
 | Переменные окружения | своих нет; следует разрешению `DSH_HOME` в DSH |
 | Чувствительные данные | нет — ключи, токены и учётные данные не читаются и не сохраняются |
 
@@ -147,6 +154,7 @@ effort-slider:
   defaultDialect: effort # сетевой диалект по умолчанию
   routes:
     my-gateway: deepseek # переопределение по маршруту
+  debugReport: false     # отчёт о предоставлении за каждый запуск (маршрут/модель/диалект/записано-или-пропущено) + трассировка усилия по каждому запросу (llm/stream) в лог хоста
 ```
 
 ## Права и данные
@@ -162,7 +170,7 @@ effort-slider:
 
 | Половина | Файл | Роль |
 | --- | --- | --- |
-| Хост | `lib/index.js` | Универсальное предоставление усилий: находит profile entry pi-ai (`llm-pi-ai`), читает её через `settings.describe()`, дописывает сетевые диалекты через `settings.mutate` (`buildProvisionOps`, идемпотентно, уважает объявления пользователя); слушает `llm/adapters-updated` / `settings/document-updated` |
+| Хост | `lib/index.js` | Универсальное предоставление усилий: находит profile entry pi-ai (`llm-pi-ai`), читает её через `settings.describe()`, дописывает сетевые диалекты через `settings.mutate` (`buildProvisionOps`, идемпотентно, уважает объявления пользователя); слушает `llm/adapters-updated` / `settings/document-updated`. С `debugReport: true` каждый запуск выводит отчёт по маршруту/модели (записанные поля или причина пропуска, с пометкой, где диалект не применяется) вместо однострочного счётчика, а каждый вызов модели трассируется как `[debug] request route=… model=… effort=…` через read-only прохождение `llm/stream` |
 | Браузер | `lib/client.js` | Перехватывает клики по строке Effort меню моделей → показывает панель Effort; читает `ctx.modelDirectories.directoryFor(sessionId)` и пишет через `directory.select({ reasoningEffort })`; MutationObserver поддерживает цвет уровня на строке меню после закрытия панели |
 
 > Браузерная часть следует официальной конвенции внешних плагинов: классический скрипт + фабрика `window.__ModuleLoader__.load`; `react` / `react-dom/client` / `react/jsx-runtime` — платформенные externals; `effort.module.css` хешируется и встраивается lightningcss, инъекция как `<style data-plugin>` при запуске фабрики.
@@ -171,13 +179,13 @@ effort-slider:
 
 | Симптом | Решение |
 | --- | --- |
-| В меню моделей нет строки Effort | Модель не объявляет метаданные рассуждений, и предоставление на хосте не действует — убедитесь, что DSH перезапускался, и проверьте `enabled` на странице настроек плагина (его конфигурация profile entry) |
+| В меню моделей нет строки Effort | Модель не объявляет метаданные рассуждений, и предоставление на хосте не действует — убедитесь, что DSH перезапускался, и проверьте `enabled` на странице настроек плагина (его конфигурация profile entry); задайте `debugReport: true` и проверьте лог хоста на предмет отчёта о предоставлении по каждой модели |
 | Панель пишет 「当前模型不支持思考强度调节」 | Универсальный резерв не активен — обновитесь до v0.2.0+ и перезапустите |
 | Плагин вообще не загружается (строка помечена `disabled: true`) | Ранняя сборка была выключена в `~/.dsh/profiles/web/cordis.patch.yml`; удалите эту строку и перезапустите |
-| Перетаскивание не действует | Проверьте, совпадает ли сетевой диалект целевого эндпоинта (см. таблицу диалектов), или задайте `defaultDialect` для этого маршрута |
+| Перетаскивание не действует | Проверьте, совпадает ли сетевой диалект целевого эндпоинта (см. таблицу диалектов — диалекты переводят только на маршрутах `api: openai-completions`), или задайте `defaultDialect` для этого маршрута. С `debugReport: true` лог хоста покрывает всю проверяемую цепочку: отчёт по модели точно говорит, что было записано (или пропущено, и почему), и помечает маршруты, где диалект не применяется, а строки `[debug] request route=… model=… effort=…` доказывают, какой уровень несёт каждый вызов. Остаётся только проводная трансляция внутри pi-ai, которую не может наблюдать ни один плагин. Кнопка `?` панели повторяет этот чек-лист |
 | Конфликты с другими плагинами-скинами | Если установлен другой скин, перехватывающий строку Effort (например, скин aurora из dsh-ui-web), отключите его перехват, чтобы избежать двойных панелей |
 | После перезапуска версия всё ещё старая | Установки `file:` — снапшот-копии; используйте спецификацию `github:` или повторите `add`, затем перезапустите |
-| Где логи? | Ошибки хоста: лог запуска DSH; ошибки клиента: консоль DevTools браузера (F12) (префикс `[effort-slider]`) |
+| Где логи? | Ошибки хоста: лог запуска DSH (с `debugReport: true` детали предоставления и трассировки усилия по запросам выводятся строками `effort-slider: [debug]`); ошибки клиента: консоль DevTools браузера (F12) (префикс `[effort-slider]`) |
 
 ## Структура проекта
 
@@ -227,6 +235,20 @@ pnpm test        # юнит-тесты хоста + интеграция apply +
 [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md).
 
 **Безопасность**: этот плагин не читает учётные данные и ничего не отправляет по сети (общается только с локальным DSH). О проблемах безопасности сообщайте приватно через **Report a vulnerability** на вкладке Security GitHub — не открывайте публичный issue с деталями эксплойта.
+
+## Star History
+
+<div align="center">
+
+<a href="https://star-history.com/#2768651338/dsh-effort-slider&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=2768651338/dsh-effort-slider&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=2768651338/dsh-effort-slider&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=2768651338/dsh-effort-slider&type=Date" />
+  </picture>
+</a>
+
+</div>
 
 ---
 

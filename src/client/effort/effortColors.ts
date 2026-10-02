@@ -38,10 +38,18 @@ const LABEL_ALIASES: Record<string, string> = {
   max: 'max', ultra: 'max', xhigh: 'max', ultracode: 'max', maximum: 'max',
 }
 
+/** id 别名 → 规范 id（ultra/xhigh/maximum 都按 max 处理）。 */
+export const canonicalEffortId = (effortId: string): string => ALIASES[effortId] ?? effortId
+
+/** 档位显示名 → 规范 id；无法识别返回 null。 */
+export const effortIdFromLabel = (label: string): string | null => {
+  const key = label.trim().toLowerCase()
+  return LABEL_ALIASES[key] ?? null
+}
+
 /** 由显示名推断档位颜色；无法识别时返回 null（保持官方原色）。 */
 export const effortColorFromLabel = (label: string): EffortColor | null => {
-  const key = label.trim().toLowerCase()
-  const id = LABEL_ALIASES[key]
-  if (id === undefined) return null
+  const id = effortIdFromLabel(label)
+  if (id === null) return null
   return EFFORT_COLORS[id] ?? null
 }

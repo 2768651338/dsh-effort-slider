@@ -12,7 +12,9 @@ import { VERT, FRAG_SIM, FRAG_BLUR, FRAG_COMP } from './shaders.ts'
  * Start the fire loop on the given canvas.
  * @param canvasRef - the track canvas.
  * @param getSlider - returns the current slider position in 0..1.
- * @param getActive - whether the fire should burn (panel open).
+ * @param getActive - whether the fire should burn (slider usable — the track
+ *   is hidden otherwise, so the loop sleeps after MAX_IDLE idle frames and is
+ *   re-ignited by the per-render kick once it becomes usable again).
  */
 export function useWebglFire(
   canvasRef: RefObject<HTMLCanvasElement | null>,
@@ -337,14 +339,12 @@ export function useWebglFire(
 
     compilePrograms()
     if (programsReady) {
-      console.log(`[effort-slider] fire: gl ready (canvas ${canvas.clientWidth}x${canvas.clientHeight})`)
       resizeObserver = new ResizeObserver(() => {
         window.clearTimeout(resizeDebounce)
         resizeDebounce = window.setTimeout(resize, 80)
       })
       resizeObserver.observe(canvas)
       resize()
-      console.log(`[effort-slider] fire: buffer ${canvas.width}x${canvas.height}`)
       if (sliderRef.current > 0) ensureLoop()
       else console.warn('[effort-slider] fire: skipped start, slider=0')
     } else {

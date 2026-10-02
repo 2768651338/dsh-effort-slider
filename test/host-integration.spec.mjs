@@ -109,9 +109,19 @@ root.provide('settings', fakeSettings)
 assert(root.get('settings') !== undefined, '0.2.0 SettingsForms seam mounted as ctx.settings')
 
 // ---- 桩 llm 服务（0.2.0 公开面：listModels / resolveModelInfo / 可配置提供方目录）----
+// listModels 可被 raceArmed 预约一次「供给计算期间的用户编辑」（P1-3 竞态用例）。
+let raceArmed = false
 const listed = ['gpt-4o', 'claude-3']
 root.provide('llm', {
-  listModels: async () => listed.map((id) => ({ provider: 'gateway', id, name: id })),
+  listModels: async () => {
+    if (raceArmed) {
+      raceArmed = false
+      // 模拟用户恰在此刻在设置页保存了编辑：改条目值并推进修订号。
+      userLayers.get('llm-pi-ai').providers.gateway.models.push({ id: 'user-added', name: 'User Added' })
+      revisions.set('llm-pi-ai', (revisions.get('llm-pi-ai') ?? 0) + 1)
+    }
+    return listed.map((id) => ({ provider: 'gateway', id, name: id }))
+  },
   resolveModelInfo: async (_provider, model) => ({ provider: 'gateway', id: model, name: model }),
   listConfigurableProviders: () => [],
 })
@@ -132,6 +142,8 @@ const fakePiAi = {
               { id: 'claude-3', name: 'Claude 3' },
             ],
           },
+          // 纯目录路由：让 provision 的 await 链路上有一个可注入并发编辑的时点。
+          catalog: { api: 'openai-completions' },
         },
       })
       root.emit('llm/adapters-updated')
@@ -200,6 +212,23 @@ await settle(300)
 const doc2 = userLayers.get('llm-pi-ai')
 const custom = doc2?.providers?.gateway?.models?.[0]
 assert(custom?.reasoningEfforts === false, 'user-declared reasoningEfforts:false is respected and not overwritten')
+
+// ---- 3.5 P1-3：mutate 前快照一致性校验——供给计算期间的用户编辑不被覆盖 ----
+raceArmed = true
+const updatesBeforeRace = documentUpdates.filter((u) => u.ns === 'llm-pi-ai').length
+root.emit('llm/adapters-updated')
+await settle(400)
+const updatesAfterRace = documentUpdates.filter((u) => u.ns === 'llm-pi-ai').length
+assert(updatesAfterRace === updatesBeforeRace, 'snapshot changed mid-provision defers the write (no mutate lands)')
+const midRaceModels = userLayers.get('llm-pi-ai').providers.gateway.models
+assert(midRaceModels.some((m) => m.id === 'user-added' && m.reasoningEfforts === undefined), 'user-added entry survives the deferred round untouched')
+// 用户的编辑在真实宿主里会触发 document-updated；这里手动驱动同一语义的下一轮。
+root.emit('llm/adapters-updated')
+await settle(400)
+const gatewayModels = userLayers.get('llm-pi-ai')?.providers?.gateway?.models ?? []
+assert(gatewayModels.length === 2, 'next round re-provisions from the fresh snapshot (both entries kept)')
+assert(gatewayModels.find((m) => m.id === 'custom')?.reasoningEfforts === false, 'user-declared false still untouched after the race round')
+assert(gatewayModels.find((m) => m.id === 'user-added')?.reasoningEfforts?.max === 'max', 'user-added model gets provisioned in the next round')
 
 // ---- 4. 本插件条目配置：enabled=false 关停后续供给 ----
 await root.dispose?.()

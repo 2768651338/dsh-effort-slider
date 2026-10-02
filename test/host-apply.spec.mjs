@@ -38,6 +38,8 @@ const piAiEntry = {
     gateway: {
       models: [{ id: 'm-1' }],
     },
+    // 纯目录路由（无 models 列表）：供给走 listModels + modelOverrides
+    catalogFail: {},
   },
 }
 const mutations = []
@@ -63,7 +65,7 @@ const settings = {
 
 // ---- mock llm（0.2.0 公开面：listModels / resolveModelInfo / 可配置提供方目录）----
 const llm = {
-  listModels: async () => [],
+  listModels: async () => { throw new Error('network down') },
   resolveModelInfo: async () => ({}),
   listConfigurableProviders: () => [],
 }
@@ -71,11 +73,13 @@ const llm = {
 // ---- mock cordis ctx ----
 const listeners = {}
 const disposers = []
+const logInfo = []
+const logWarn = []
 const ctx = {
   get: (name) => (name === 'llm' ? llm : name === 'settings' ? settings : undefined),
   on: (ev, fn) => { listeners[ev] = fn },
   effect: (fn, label) => { disposers.push(fn()) },
-  logger: { info() {}, warn() {}, error() {} },
+  logger: { info: (m) => logInfo.push(String(m)), warn: (m) => logWarn.push(String(m)), error: () => {} },
 }
 
 // ---- 加载宿主产物 ----
@@ -116,6 +120,16 @@ if (piAiMutations.length > 0) {
   assert(undeclared?.[0].compat === undefined, 'undeclared-api route gets NO compat (protocol unknown)')
 }
 
+// ---- P1-4：纯目录路由的 listModels 失败必须留下诊断日志，且不阻塞其他路由 ----
+assert(logWarn.some((w) => w.includes('listModels') && w.includes('catalogFail')), 'listModels failure for a catalog route leaves a diagnostic warn (P1-4)')
+assert(logWarn.every((w) => !w.includes('not mounted after')), 'no retry-exhaustion warn while provisioning eventually succeeds')
+
+// ---- P3-1（debugReport 关）：保持原有的单行计数日志 ----
+assert(logInfo.some((m) => m.includes('provisioning ') && m.includes('field(s) across pi-ai models')), 'debugReport off keeps the single-line provisioning count (P3-1)')
+assert(logInfo.every((m) => !m.includes('[debug]')), 'no [debug] lines while debugReport is off (P3-1)')
+// ---- P3-2（debugReport 关）：不挂 llm/stream 请求追踪器 ----
+assert(listeners['llm/stream'] === undefined, 'no llm/stream request tracer while debugReport is off (P3-2)')
+
 // ---- 幂等：已供给过的配置不再产生写入 ----
 mutations.length = 0
 listeners['llm/adapters-updated']?.()
@@ -129,6 +143,63 @@ assert(mutations.length === 0, 'document-updated echo for pi-ai entry does not r
 listeners['settings/document-updated']?.('unrelated-entry', 7)
 await flush()
 assert(mutations.length === 0, 'document-updated for an unrelated entry does not trigger provisioning')
+
+// ---- P3-1：debugReport 开启时输出逐模型明细，替代单行计数 ----
+// 重置 pi-ai 条目为「未供给」形状：一个待注入模型 + 一个用户显式声明的模型；
+// 另加两条 P3-2 对照路由——声明了非 openai-completions 协议的路由与未声明协议的路由，
+// 它们的明细行必须注明「方言不作用于线上」。
+piAiEntry.providers = {
+  jiyuanlvdong: {
+    api: 'openai-completions',
+    models: [
+      { id: 'gpt-4o' },
+      { id: 'user-kept', reasoningEfforts: false },
+    ],
+  },
+  anthropic: { api: 'anthropic-messages', models: [{ id: 'sonnet' }] },
+  gateway: { models: [{ id: 'm-1' }] },
+}
+mutations.length = 0
+const logInfo2 = []
+const logWarn2 = []
+const listeners2 = {}
+const ctx2 = {
+  get: (name) => (name === 'llm' ? llm : name === 'settings' ? settings : undefined),
+  on: (ev, fn) => { listeners2[ev] = fn },
+  effect: (fn) => { fn() },
+  logger: { info: (m) => logInfo2.push(String(m)), warn: (m) => logWarn2.push(String(m)), error: () => {} },
+}
+mod.apply(ctx2, { debugReport: true })
+await flush()
+assert(mutations.some((m) => m.ops.length > 0), 'debugReport on: provisioning still writes (report replaces only the log line)')
+const debugLines = logInfo2.filter((m) => m.includes('[debug]'))
+assert(debugLines.length >= 2, 'debugReport on emits a header line plus per-model report lines (P3-1)')
+assert(debugLines.some((m) => m.includes('jiyuanlvdong') && m.includes('gpt-4o') && m.includes('write reasoningEfforts + compat') && m.includes('api=openai-completions')), 'report line names route/model/resolved api/written fields (P3-1)')
+assert(debugLines.some((m) => m.includes('user-kept') && m.includes('skip: user-declared')), 'report line explains the user-declared skip (P3-1)')
+assert(logInfo2.every((m) => !m.includes('field(s) across pi-ai models')), 'single-line count is replaced while debugReport is on (P3-1)')
+
+// ---- P3-2：明细行注明方言何时才作用于线上（compat 只对显式声明的 openai-completions）----
+assert(debugLines.some((m) => m.includes('anthropic-messages') && m.includes('dialect not applied')), 'report line notes the dialect is not applied on a declared non-openai-completions api (P3-2)')
+assert(debugLines.some((m) => m.includes('route "gateway"') && m.includes('none found')), 'report line notes the undeclared-api case (P3-2)')
+const ocLine = debugLines.find((m) => m.includes('gpt-4o') && m.includes('write'))
+assert(ocLine !== undefined && !ocLine.includes('dialect not applied'), 'openai-completions lines carry no dialect note (P3-2)')
+
+// ---- P3-2：请求追踪（llm/stream 只读透传，仅 debugReport 开启时挂载）----
+assert(typeof listeners2['llm/stream'] === 'function', 'debugReport on attaches an llm/stream request tracer (P3-2)')
+const passthrough = Symbol('stream')
+const traced = listeners2['llm/stream']({ provider: 'gateway', model: 'm-1', reasoningEffort: 'high' }, () => passthrough)
+assert(traced === passthrough, 'tracer returns next() untouched (read-only passthrough)')
+assert(logInfo2.some((m) => m.includes('[debug] request') && m.includes('route=gateway') && m.includes('model=m-1') && m.includes('effort=high')), 'tracer logs route/model/effort per request (P3-2)')
+listeners2['llm/stream']({ provider: 'gateway', model: 'm-1', reasoningEffort: undefined, purpose: 'compaction' }, () => passthrough)
+assert(logInfo2.some((m) => m.includes('effort=(none)') && m.includes('purpose=compaction')), 'tracer notes a missing effort and auxiliary purpose (P3-2)')
+
+// 幂等复判：明细全部是 skip-current，且不再写入
+logInfo2.length = 0
+mutations.length = 0
+listeners2['llm/adapters-updated']?.()
+await flush()
+assert(mutations.length === 0, 'debug idempotent round writes nothing')
+assert(logInfo2.some((m) => m.includes('[debug]') && m.includes('already current')), 'idempotent debug round reports skip: already current (P3-1)')
 
 console.log(failures === 0 ? 'ALL HOST APPLY SPECS PASSED' : failures + ' CHECK(S) FAILED')
 if (failures > 0) process.exit(1)

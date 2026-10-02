@@ -103,6 +103,20 @@ export function wireFor(
   }
 }
 
+/**
+ * 方言适用性备注（P3-2）：线方言的 compat（真正把档位翻译成线上字段的配置）
+ * 只注入给显式声明 openai-completions 协议的路由/模型——其余协议由 pi-ai 内建
+ * 翻译，方言配置不参与线上。debugReport 明细据此在行内注明这一事实，直接回答
+ * 「我配了方言为什么没效果」。只陈述插件做了什么、方言何时才生效，不猜测端点
+ * 行为——误导性的「配错了」结论会让用户把正确的配置改错（评估报告 P3-2 取舍）。
+ */
+export function dialectAppliesNote(api: string | undefined): string | undefined {
+  if (api === 'openai-completions') return undefined
+  return api === undefined
+    ? 'note: wire dialect not applied — compat needs an explicit api=openai-completions declaration (none found)'
+    : `note: wire dialect not applied — compat needs api=openai-completions, this model runs api=${api}`
+}
+
 export interface PiAiProfile {
   api?: string
   models?: Array<{ id: string; reasoningEfforts?: unknown; compat?: unknown }>
@@ -114,7 +128,8 @@ export type PathOp =
   | { op: 'set'; path: string[]; value: unknown }
   | { op: 'unset'; path: string[] }
 
-function deepEqualJson(a: unknown, b: unknown): boolean {
+/** JSON 语义深比较（宿主 index.ts 的快照一致性校验也复用）。 */
+export function deepEqualJson(a: unknown, b: unknown): boolean {
   if (a === b) return true
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
   if (Array.isArray(a) || Array.isArray(b)) {
@@ -136,30 +151,70 @@ export function isOurInjection(reasoningEfforts: unknown): boolean {
   )
 }
 
+/** 供给明细（debugReport）里一条决策的动作——write 之外的取值都是跳过原因。 */
+export type ProvisionAction =
+  | 'write'
+  | 'skip-user-false'
+  | 'skip-user-custom'
+  | 'skip-native-reasoning'
+  | 'skip-current'
+  | 'skip-empty'
+
+/** 供给决策明细的一条记录（debugReport 开启时逐条输出到宿主日志）。 */
+export interface ProvisionDecision {
+  route: string
+  /** 模型 id；路由级条目（整条路由无可供给的模型）缺省。 */
+  model?: string
+  dialect: WireDialect
+  /** 解析到的线上协议（路由/模型声明了 api 时携带）。 */
+  api?: string
+  action: ProvisionAction
+  /** action === 'write' 时实际会写入的字段。 */
+  fields?: Array<'reasoningEfforts' | 'compat'>
+}
+
+/** injectedModels 的模型级决策回调（调用方负责补 route/dialect 上下文）。 */
+export type InjectedModelDecision = (
+  modelId: string,
+  action: 'write' | 'skip-user-false' | 'skip-user-custom' | 'skip-current',
+  fields?: Array<'reasoningEfforts' | 'compat'>,
+  api?: string,
+) => void
+
 /**
  * 为显式 models 数组计算注入后的完整条目，供「整数组替换」使用。
  * dsh-settings 的 path 补丁不能穿过数组中间节点（applyPathOp 会把数组
  * 当作非 plain object 重建为对象、丢失其余条目），所以对 models 只能
  * 一次性 replace 整个数组，而不是逐条写 models[i].reasoningEfforts。
+ * @param onDecision - 逐模型决策回调（debugReport 明细的数据源），缺省不产出。
  * @returns 注入后的完整 models 数组，以及是否发生了任何变化。
  */
 export function injectedModels(
   profile: PiAiProfile,
   dialect: WireDialect,
   apiOf: (modelId: string) => string | undefined,
+  onDecision?: InjectedModelDecision,
 ): { models: Array<Record<string, unknown>>; changed: boolean } {
   const models = profile.models ?? []
   let changed = false
   const next = models.map((entry) => {
     const result: Record<string, unknown> = { ...(entry as Record<string, unknown>) }
     // 用户显式声明（false 或自定义字典）一律尊重，原样保留。
-    if (entry.reasoningEfforts === false) return result
-    if (entry.reasoningEfforts !== undefined && !isOurInjection(entry.reasoningEfforts)) return result
+    if (entry.reasoningEfforts === false) {
+      onDecision?.(entry.id, 'skip-user-false')
+      return result
+    }
+    if (entry.reasoningEfforts !== undefined && !isOurInjection(entry.reasoningEfforts)) {
+      onDecision?.(entry.id, 'skip-user-custom')
+      return result
+    }
     const api = apiOf(entry.id) ?? profile.api
     const injection = wireFor(dialect, api === 'openai-completions')
+    const fields: Array<'reasoningEfforts' | 'compat'> = []
     if (!deepEqualJson(entry.reasoningEfforts, injection.reasoningEfforts)) {
       result.reasoningEfforts = injection.reasoningEfforts
       changed = true
+      fields.push('reasoningEfforts')
     }
     if (injection.compat !== undefined) {
       const compat = (entry.compat ?? {}) as Record<string, unknown>
@@ -170,8 +225,10 @@ export function injectedModels(
       if (Object.keys(patch).length > 0) {
         result.compat = { ...compat, ...patch }
         changed = true
+        fields.push('compat')
       }
     }
+    onDecision?.(entry.id, fields.length > 0 ? 'write' : 'skip-current', fields.length > 0 ? fields : undefined, api)
     return result
   })
   return { models: next, changed }
@@ -188,6 +245,7 @@ export function injectedModels(
  * @param apiOf - 取模型线上协议的解析器（未知返回 undefined，此时不注入 compat）。
  * @param catalogIds - 纯目录路由的目录模型 id 列表（仅无 models 时使用）。
  * @param hasNativeReasoning - 判断某模型是否已有原生 reasoning 元数据（目录模型用）。
+ * @param onDecision - 逐模型决策回调（debugReport 明细的数据源），缺省不产出。
  */
 export async function buildProvisionOps(
   route: string,
@@ -196,15 +254,28 @@ export async function buildProvisionOps(
   apiOf: (modelId: string) => string | undefined,
   catalogIds: string[] = [],
   hasNativeReasoning: (modelId: string) => boolean = () => false,
+  onDecision?: (decision: ProvisionDecision) => void,
 ): Promise<PathOp[]> {
   const ops: PathOp[] = []
+  /** 把模型级决策包上 route/dialect 上下文交给明细回调。 */
+  const emitDecision: InjectedModelDecision = (modelId, action, fields, api) => {
+    onDecision?.({ route, model: modelId, dialect, api, action, fields })
+  }
   const pushFor = (basePath: string[], entry: { id: string; reasoningEfforts?: unknown; compat?: unknown }): void => {
-    if (entry.reasoningEfforts === false) return
-    if (entry.reasoningEfforts !== undefined && !isOurInjection(entry.reasoningEfforts)) return
+    if (entry.reasoningEfforts === false) {
+      emitDecision(entry.id, 'skip-user-false')
+      return
+    }
+    if (entry.reasoningEfforts !== undefined && !isOurInjection(entry.reasoningEfforts)) {
+      emitDecision(entry.id, 'skip-user-custom')
+      return
+    }
     const api = apiOf(entry.id) ?? profile.api
     const injection = wireFor(dialect, api === 'openai-completions')
+    const fields: Array<'reasoningEfforts' | 'compat'> = []
     if (!deepEqualJson(entry.reasoningEfforts, injection.reasoningEfforts)) {
       ops.push({ op: 'set', path: [...basePath, 'reasoningEfforts'], value: injection.reasoningEfforts })
+      fields.push('reasoningEfforts')
     }
     if (injection.compat !== undefined) {
       const compat = (entry.compat ?? {}) as Record<string, unknown>
@@ -214,13 +285,15 @@ export async function buildProvisionOps(
       }
       if (Object.keys(patch).length > 0) {
         ops.push({ op: 'set', path: [...basePath, 'compat'], value: { ...compat, ...patch } })
+        fields.push('compat')
       }
     }
+    emitDecision(entry.id, fields.length > 0 ? 'write' : 'skip-current', fields.length > 0 ? fields : undefined, api)
   }
   const models = profile.models
   if (models !== undefined && models.length > 0) {
     // models 是数组：path 补丁穿不过数组中间节点，改为整数组替换。
-    const { models: nextModels, changed } = injectedModels(profile, dialect, apiOf)
+    const { models: nextModels, changed } = injectedModels(profile, dialect, apiOf, emitDecision)
     if (changed) {
       ops.push({ op: 'set', path: ['providers', route, 'models'], value: nextModels })
     }
@@ -230,7 +303,10 @@ export async function buildProvisionOps(
   if (catalogIds.length === 0) return ops
   const overrides = profile.modelOverrides ?? {}
   for (const id of catalogIds) {
-    if (hasNativeReasoning(id)) continue
+    if (hasNativeReasoning(id)) {
+      onDecision?.({ route, model: id, dialect, action: 'skip-native-reasoning' })
+      continue
+    }
     const entry: { id: string; reasoningEfforts?: unknown; compat?: unknown } = { id, ...(overrides[id] ?? {}) }
     pushFor(['providers', route, 'modelOverrides', id], entry)
   }

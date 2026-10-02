@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.4.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -40,6 +40,8 @@
 
 ---
 
+> 🆕 **v0.5.0** — 评估修复批次。可靠性：面板将「加载中 / 加载失败 / 不支持」拆分为三分支状态并附重试按钮；滑杆写入失败时 header 状态短暂变红而非静默；供给途中检测用户并发编辑（`mutate` 前重读条目，冲突轮让路）；宿主供给全部失败路径均落告警，Effort 行从未被识别时输出一次性诊断。面板交互：跟随滚动/窗口变化重新定位，Esc / 点击外部 / 锚点卸载时关闭，再次点击 Effort 行可收起；刻度点与标签对齐真实吸附位置；滑杆带 `aria-label` / `aria-valuetext`；UI 文案双语（zh/en，跟随 `<html lang>`）。新增 `debugReport` 选项：逐路由逐模型供给明细，并可选只读 `llm/stream` 追踪逐请求记录 route/model/effort；面板 header 的「?」提示指向 `enabled` / 方言 / `debugReport` 排查链路。另外：新增 GitHub Actions CI（typecheck + 测试 + 构建 + 产物新鲜度门禁）；面板开着但不可见时 WebGL 火焰不再 60fps 空烧；npm 包更名为 `@txc2768651338/dsh-effort-slider`（旧无 scope 名 `dsh-effort-slider` 弃用）。
+>
 > 🆕 **v0.4.0** — 适配 DSH **0.2.0**：DSH 用 `SettingsForms` 取代了原有 settings 服务（设置现以 profile entry 配置形式存在；`installSection` / `settings.get` / `settings/updated` 均已移除）。宿主半区现定位 pi-ai profile entry（`llm-pi-ai`），经 `settings.describe()` 读取、经 `settings.mutate()` 写入，并监听 `settings/document-updated`。客户端半区改由 `retainedBy.mainView` 推导当前会话（`SessionListState.current` 已移除）。插件选项（`enabled` / `defaultDialect` / `routes`）存于插件的 entry 配置，可在 DSH 设置页编辑。不再支持 DSH ≤ 0.1.5（该版本请使用 v0.3.0）。
 >
 > 🆕 **v0.3.0** — 适配 DSH 0.1.5：客户端 `Context` 改取自 `@deepseek-ai/cordis`，会话状态经 `ctx.modelDirectories` 读写，设置段经 `settings.installSection()` 安装；删除已不可行的适配器元数据包装（见下方「通用思考强度」一节）。不再支持 DSH ≤ 0.1.1。
@@ -93,7 +95,8 @@
 > 「模型目录」的声明。模型级 `compat` 只在路由声明了 `api: openai-completions` 时写入，因为 pi-ai
 > 会拒绝「该模型协议读不到的开关」。
 
-支持的自定义端点线方言（设置 `effort-slider.defaultDialect` 或 `routes.<路由>`）：
+支持的自定义端点线方言（设置 `effort-slider.defaultDialect` 或 `routes.<路由>`）。方言只在 `api: openai-completions`
+的路由上翻译档位 —— 原生协议由 pi-ai 内建映射，方言配置在该类路由的线上不产生效果：
 
 | 方言 | 线上效果 |
 | --- | --- |
@@ -117,7 +120,10 @@
 ## 安装 / 卸载
 
 ```sh
-# GitHub 安装（lib/ 构建产物已提交，无需本地构建）
+# npm 安装（deepseek1024.com 目录收录的包）
+dsh plugin --profile web add @txc2768651338/dsh-effort-slider
+
+# 或从 GitHub 安装（lib/ 构建产物已提交，无需本地构建）
 dsh plugin --profile web add github:2768651338/dsh-effort-slider#main
 
 # 或本地构建后从检出目录安装
@@ -133,8 +139,8 @@ dsh plugin --profile web add file:./dsh-effort-slider
 
 | 操作 | 命令 |
 | --- | --- |
-| 升级 | `dsh plugin --profile web update dsh-effort-slider`（或重跑 add），然后重启 DSH |
-| 卸载 | `dsh plugin --profile web remove dsh-effort-slider`，并从 `cordis.patch.yml` 移除其行（如有） |
+| 升级 | `dsh plugin --profile web update @txc2768651338/dsh-effort-slider`（或重跑 add），然后重启 DSH |
+| 卸载 | `dsh plugin --profile web remove @txc2768651338/dsh-effort-slider`，并从 `cordis.patch.yml` 移除其行（如有） |
 
 ## 快速开始
 
@@ -149,8 +155,8 @@ DevTools Console 出现 `[effort-slider] intercept row: ...` 表示拦截成功�
 
 | 项目 | 详情 |
 | --- | --- |
-| 插件级选项 | 插件的 profile entry 配置（`enabled` / `defaultDialect` / `routes`），可在 DSH 设置页（自动生成的表单）编辑，插件重挂载时生效 |
-| 默认值 | `enabled: true`，`defaultDialect: effort` |
+| 插件级选项 | 插件的 profile entry 配置（`enabled` / `defaultDialect` / `routes` / `debugReport`），可在 DSH 设置页（自动生成的表单）编辑，插件重挂载时生效 |
+| 默认值 | `enabled: true`，`defaultDialect: effort`，`debugReport: false` |
 | 环境变量 | 无自有变量，遵循 DSH 的 `DSH_HOME` 解析 |
 | 敏感项 | 无 — 不读取、不存储任何密钥/令牌/凭据 |
 
@@ -160,6 +166,7 @@ effort-slider:
   defaultDialect: effort # 全局默认线方言
   routes:
     my-gateway: deepseek # 按路由覆盖
+  debugReport: false     # 每轮供给输出明细报告（路由/模型/方言/写入或跳过原因），并以 llm/stream 逐请求追踪档位，均输出到宿主日志
 ```
 
 ## 权限与数据
@@ -175,7 +182,7 @@ effort-slider:
 
 | 半区 | 文件 | 职责 |
 | --- | --- | --- |
-| 宿主 | `lib/index.js` | 通用思考强度供给：定位 pi-ai profile entry（`llm-pi-ai`），经 `settings.describe()` 读取，经 `settings.mutate` 补写线方言（`buildProvisionOps`，幂等、尊重用户声明）；监听 `llm/adapters-updated` / `settings/document-updated` |
+| 宿主 | `lib/index.js` | 通用思考强度供给：定位 pi-ai profile entry（`llm-pi-ai`），经 `settings.describe()` 读取，经 `settings.mutate` 补写线方言（`buildProvisionOps`，幂等、尊重用户声明）；监听 `llm/adapters-updated` / `settings/document-updated`。`debugReport: true` 时每轮供给输出逐路由/逐模型明细（写入字段或跳过原因，方言不生效处注明）替代单行计数，并以只读 `llm/stream` 透传逐请求记录 `[debug] request route=… model=… effort=…` |
 | 浏览器 | `lib/client.js` | 捕获阶段拦截模型菜单「推理等级」行 → 弹出 Effort 面板；经 `ctx.modelDirectories.directoryFor(sessionId)` 读目录、经 `directory.select({ reasoningEffort })` 写入；面板关闭后经 MutationObserver 守护菜单行档位色 |
 
 > 浏览器半区遵循官方外部插件约定：经典脚本 + `window.__ModuleLoader__.load` 工厂；
@@ -186,13 +193,13 @@ effort-slider:
 
 | 现象 | 解决 |
 | --- | --- |
-| 模型菜单没有「推理等级」行 | 该模型未声明 reasoning 元数据且宿主供给未生效 — 确认重启过 DSH，并在插件的设置页（其 profile entry 配置）检查 `enabled` |
+| 模型菜单没有「推理等级」行 | 该模型未声明 reasoning 元数据且宿主供给未生效 — 确认重启过 DSH，并在插件的设置页（其 profile entry 配置）检查 `enabled`；将 `debugReport` 设为 `true` 后到宿主日志查看逐模型供给明细 |
 | 面板显示「当前模型不支持思考强度调节」 | 通用兜底未启用 — 升级到 v0.2.0+ 并重启 |
 | 插件根本没加载（行被标了 `disabled: true`） | 旧构建曾在 `~/.dsh/profiles/web/cordis.patch.yml` 里被关掉；删掉该行再重启 |
-| 拖动后档位不生效 | 检查目标端点的线方言是否匹配（见上方方言表），或为该路由显式设置 `defaultDialect` |
+| 拖动后档位不生效 | 检查目标端点的线方言是否匹配（见上方方言表 —— 方言只在 `api: openai-completions` 路由上翻译），或为该路由显式设置 `defaultDialect`。将 `debugReport` 设为 `true` 后，宿主日志覆盖整条可验证链路：逐模型明细精确写出写了什么（或因何跳过）并标注方言不生效的路由；`[debug] request route=… model=… effort=…` 行证明每次调用携带的档位。剩下只有 pi-ai 内部的线上翻译是插件观测不到的。面板的 `?` 按钮复述了这份排查清单 |
 | 与其它皮肤插件冲突 | 若同时安装了会拦截「推理等级」行的皮肤（如 dsh-ui-web 系列的 aurora），需将其拦截段禁用，避免双面板 |
 | 重启后版本仍显示旧版 | `file:` 安装是快照拷贝 — 用 `github:` 安装或重跑 add 后再重启 |
-| 日志在哪 | 宿主错误看 DSH 启动日志；客户端错误看浏览器 DevTools（F12）Console（`[effort-slider]` 前缀） |
+| 日志在哪 | 宿主错误看 DSH 启动日志（`debugReport: true` 时供给明细与逐请求档位追踪以 `effort-slider: [debug]` 行输出）；客户端错误看浏览器 DevTools（F12）Console（`[effort-slider]` 前缀） |
 
 ## 结构
 
@@ -243,6 +250,20 @@ pnpm test        # 宿主单测 + apply 集成 + 真实接缝集成 + jsdom 冒�
 
 **安全**：本插件不读取任何凭据、不发送任何网络数据（仅与本机 DSH 通信）。安全问题的私下报告请使用
 GitHub Security tab 的 **Report a vulnerability**，勿公开张贴利用细节。
+
+## Star History
+
+<div align="center">
+
+<a href="https://star-history.com/#2768651338/dsh-effort-slider&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=2768651338/dsh-effort-slider&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=2768651338/dsh-effort-slider&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=2768651338/dsh-effort-slider&type=Date" />
+  </picture>
+</a>
+
+</div>
 
 ---
 

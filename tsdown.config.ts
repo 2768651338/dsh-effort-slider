@@ -7,7 +7,6 @@
  */
 
 import { readFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
 import { basename, dirname, resolve as resolvePath } from 'node:path'
 import type { UserConfig } from 'tsdown'
 import { transform } from 'lightningcss'
@@ -28,8 +27,7 @@ const CSS_VIRTUAL_SUFFIX = '.mjs'
 
 /** 解析虚拟 CSS id 对应的物理文件。 */
 function sourceAssetPath(source: string, importer: string | undefined): string {
-  const resolved = resolvePath(dirname(importer ?? ''), source)
-  return existsSync(resolved) ? resolved : resolved
+  return resolvePath(dirname(importer ?? ''), source)
 }
 
 /** 宿主 half：ESM 库构建（纯浏览器插件，宿主侧为空操作）。 */
@@ -86,7 +84,11 @@ const clientConfig: UserConfig = {
         minify: true,
       })
       const classMap: Record<string, string> = {}
-      for (const [local, exp] of Object.entries(cssExports ?? {})) classMap[local] = exp.name
+      // 键序必须排序：lightningcss 的 cssModules 导出顺序在构建间不稳定，
+      // 不排序会让产物每次构建都不同，CI 的「产物新鲜度」检查恒红。
+      for (const [local, exp] of Object.entries(cssExports ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+        classMap[local] = exp.name
+      }
       const cssBody = [
         'const css = ' + JSON.stringify(code.toString()) + ';',
         'const tagId = ' + JSON.stringify(ID + '/' + basename(fileId)) + ';',

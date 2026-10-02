@@ -7,7 +7,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.4.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -30,6 +30,8 @@ Click the **Effort** row (second row of the official model menu) instead of the 
 
 ---
 
+> 🆕 **v0.5.0** — Evaluation-fix batch. Reliability: the panel splits loading / load-failed / unsupported into three states with a retry button; failed slider writes surface a transient red status instead of failing silently; user config edits made mid-provision are detected (the entry is re-read before `mutate`, conflicting rounds defer); every host provisioning failure path now logs a warning, and an unrecognized Effort row produces a one-time diagnostic. Panel UX: re-anchors on scroll/resize, closes on Esc / outside click / anchor unmount, and clicking the Effort row toggles it; tick dots and labels align with the real snap points; the slider carries `aria-label` / `aria-valuetext`; UI text is bilingual (zh/en, follows `<html lang>`). New `debugReport` option: per-route/per-model provisioning detail plus an optional read-only `llm/stream` tracer logging route/model/effort per request; a `?` help hint in the panel header points at `enabled` / dialect / `debugReport`. Also: GitHub Actions CI (typecheck + tests + build + stale-artifact gate), the WebGL fire no longer burns at 60 fps while invisible, and the npm package is renamed to `@txc2768651338/dsh-effort-slider` (the old unscoped `dsh-effort-slider` name is retired).
+>
 > 🆕 **v0.4.0** — Ported to DSH **0.2.0**: DSH replaced its settings service with `SettingsForms` (settings are now profile entry configs; `installSection` / `settings.get` / `settings/updated` are gone). The host half now locates the pi-ai profile entry (`llm-pi-ai`), reads it via `settings.describe()`, writes via `settings.mutate()`, and listens to `settings/document-updated`. The client half derives the current session from `retainedBy.mainView` (`SessionListState.current` was removed). Plugin options (`enabled` / `defaultDialect` / `routes`) live in the plugin's entry config, editable in the DSH settings page. DSH ≤ 0.1.5 is no longer supported (use v0.3.0 there).
 >
 > 🆕 **v0.3.0** — Ported to DSH 0.1.5: client `Context` now comes from `@deepseek-ai/cordis`, per-session state is read/written via `ctx.modelDirectories`, and the settings section is installed via `settings.installSection()`; the adapter-metadata wrapper was dropped (see [Universal effort provisioning](#universal-effort-provisioning-v020-simplified-in-v030)). DSH ≤ 0.1.1 is no longer supported.
@@ -82,7 +84,9 @@ Only `reasoningEffort` is written — model selection is untouched. Models with 
 > request wire and the model catalog. Model-level `compat` is only written when the route declares `api: openai-completions`,
 > because pi-ai refuses a switch the model's protocol cannot read.
 
-Supported wire dialects for custom endpoints (set `effort-slider.defaultDialect` or `routes.<route>`):
+Supported wire dialects for custom endpoints (set `effort-slider.defaultDialect` or `routes.<route>`). A dialect translates
+levels on `api: openai-completions` routes only — native protocols use pi-ai's built-in mapping, so the dialect setting
+has no wire effect there:
 
 | Dialect | Wire effect |
 | --- | --- |
@@ -106,7 +110,10 @@ Supported wire dialects for custom endpoints (set `effort-slider.defaultDialect`
 ## Install / Uninstall
 
 ```sh
-# Install from GitHub (the committed lib/ artifacts need no local build)
+# Install from npm (the package listed on deepseek1024.com)
+dsh plugin --profile web add @txc2768651338/dsh-effort-slider
+
+# Or install from GitHub (the committed lib/ artifacts need no local build)
 dsh plugin --profile web add github:2768651338/dsh-effort-slider#main
 
 # Or build locally and install from a checkout
@@ -122,8 +129,8 @@ row from `~/.dsh/profiles/web/cordis.patch.yml`, otherwise the new build stays s
 
 | Action | Command |
 | --- | --- |
-| Upgrade | `dsh plugin --profile web update dsh-effort-slider` (or re-run `add`), then restart DSH |
-| Uninstall | `dsh plugin --profile web remove dsh-effort-slider`, then remove its row from `cordis.patch.yml` if any |
+| Upgrade | `dsh plugin --profile web update @txc2768651338/dsh-effort-slider` (or re-run `add`), then restart DSH |
+| Uninstall | `dsh plugin --profile web remove @txc2768651338/dsh-effort-slider`, then remove its row from `cordis.patch.yml` if any |
 
 ## Quick Start
 
@@ -138,8 +145,8 @@ A `[effort-slider] intercept row: ...` line in DevTools Console means intercepti
 
 | Item | Details |
 | --- | --- |
-| Plugin options | The plugin's profile entry config (`enabled` / `defaultDialect` / `routes`), editable in the DSH settings page (auto-generated form), applied on plugin remount |
-| Defaults | `enabled: true`, `defaultDialect: effort` |
+| Plugin options | The plugin's profile entry config (`enabled` / `defaultDialect` / `routes` / `debugReport`), editable in the DSH settings page (auto-generated form), applied on plugin remount |
+| Defaults | `enabled: true`, `defaultDialect: effort`, `debugReport: false` |
 | Environment variables | None of its own; follows DSH's `DSH_HOME` resolution |
 | Sensitive items | None — no keys, tokens, or credentials are read or stored |
 
@@ -149,6 +156,7 @@ effort-slider:
   defaultDialect: effort # global default wire dialect
   routes:
     my-gateway: deepseek # per-route override
+  debugReport: false     # per-run provisioning report (route/model/dialect/write-or-skip) + per-request effort trace (llm/stream) in the host log
 ```
 
 ## Permissions & Data
@@ -164,7 +172,7 @@ effort-slider:
 
 | Half | File | Role |
 | --- | --- | --- |
-| Host | `lib/index.js` | Universal effort provisioning: locates the pi-ai profile entry (`llm-pi-ai`), reads it via `settings.describe()`, patches wire dialects (`buildProvisionOps`, idempotent, respects user declarations) via `settings.mutate`; listens to `llm/adapters-updated` / `settings/document-updated` |
+| Host | `lib/index.js` | Universal effort provisioning: locates the pi-ai profile entry (`llm-pi-ai`), reads it via `settings.describe()`, patches wire dialects (`buildProvisionOps`, idempotent, respects user declarations) via `settings.mutate`; listens to `llm/adapters-updated` / `settings/document-updated`. With `debugReport: true`, each provisioning run logs a per-route/per-model report (written fields or skip reason, plus a note where the wire dialect does not apply) instead of the one-line count, and each model call is traced as `[debug] request route=… model=… effort=…` through a read-only `llm/stream` passthrough |
 | Browser | `lib/client.js` | Captures clicks on the model menu's Effort row → shows the Effort panel; reads `ctx.modelDirectories.directoryFor(sessionId)` and writes through `directory.select({ reasoningEffort })`; a MutationObserver keeps the menu-row level color alive after the panel closes |
 
 > The browser half follows the official external-plugin convention: classic script + `window.__ModuleLoader__.load` factory;
@@ -175,13 +183,13 @@ effort-slider:
 
 | Symptom | Fix |
 | --- | --- |
-| No Effort row in the model menu | The model declares no reasoning metadata and host provisioning is not in effect — confirm DSH was restarted and check `enabled` on the plugin's settings page (its profile entry config) |
+| No Effort row in the model menu | The model declares no reasoning metadata and host provisioning is not in effect — confirm DSH was restarted and check `enabled` on the plugin's settings page (its profile entry config); set `debugReport: true` and check the host log for the per-model provisioning report |
 | Panel says 「当前模型不支持思考强度调节」 | Universal fallback not active — upgrade to v0.2.0+ and restart |
 | Plugin does not load at all (row shows `disabled: true`) | An earlier build was switched off in `~/.dsh/profiles/web/cordis.patch.yml`; delete that row and restart |
-| Dragging has no effect | Check whether the target endpoint's wire dialect matches (see the dialect table) or set `defaultDialect` for that route |
+| Dragging has no effect | Check whether the target endpoint's wire dialect matches (see the dialect table — dialects translate only on `api: openai-completions` routes) or set `defaultDialect` for that route. With `debugReport: true` the host log covers the whole chain you can verify: the per-model report states exactly what was written (or skipped, and why) and flags routes where the dialect does not apply, and `[debug] request route=… model=… effort=…` lines prove which level each call carries. That leaves only the wire translation inside pi-ai, which no plugin can observe. The panel's `?` button repeats this checklist |
 | Conflicts with other skin plugins | If another skin that intercepts the Effort row is installed (e.g. the aurora skin of dsh-ui-web), disable its interception to avoid double panels |
 | Version still shows old after restart | `file:` installs are snapshot copies — use the `github:` spec or re-run `add` before restarting |
-| Where are the logs? | Host errors: DSH startup log; client errors: browser DevTools (F12) Console (`[effort-slider]` prefix) |
+| Where are the logs? | Host errors: DSH startup log (with `debugReport: true`, provisioning details and per-request effort traces are logged as `effort-slider: [debug]` lines); client errors: browser DevTools (F12) Console (`[effort-slider]` prefix) |
 
 ## Project Structure
 
@@ -231,6 +239,20 @@ The UI implementation references the aurora skin of the community dsh-ui-web pro
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 **Security**: this plugin reads no credentials and sends nothing over the network (only talks to the local DSH). To report a security issue privately, use GitHub's **Report a vulnerability** on the Security tab — do not open a public issue with exploit details.
+
+## Star History
+
+<div align="center">
+
+<a href="https://star-history.com/#2768651338/dsh-effort-slider&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=2768651338/dsh-effort-slider&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=2768651338/dsh-effort-slider&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=2768651338/dsh-effort-slider&type=Date" />
+  </picture>
+</a>
+
+</div>
 
 ---
 

@@ -13,18 +13,15 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createRoot, type Root } from 'react-dom/client'
 import { createElement } from 'react'
 import { EffortPanel } from './effort/EffortPanel.tsx'
-import { effortColorFor, effortColorFromLabel } from './effort/effortColors.ts'
+import { effortColorFor, effortColorFromLabel, effortIdFromLabel, canonicalEffortId } from './effort/effortColors.ts'
 import { currentSessionId, type ModelDirectoriesLike, type SessionsLike } from './effort/directory.ts'
+import { PANEL_W, PANEL_H } from './effort/metrics.ts'
 
 /** 档位颜色解析（客户端产物导出，供测试/复用）。 */
 export { effortColorFor }
 
 /** 需要的客户端服务：sessions（当前会话）与 modelDirectories（每会话共享模型目录）。 */
 export const inject: string[] = ['sessions', 'modelDirectories']
-
-/** 面板尺寸（与 effort.module.css 的 .panel 宽度一致）。 */
-const PANEL_W = 280
-const PANEL_H = 150
 
 /**
  * 最近一次面板设置的档位（面板关闭后仍用于给菜单行着色）。
@@ -33,8 +30,26 @@ const PANEL_H = 150
  */
 const uiState: { lastEffortId: string | null } = { lastEffortId: null }
 
-/** 官方菜单行的 label 文本（中/英两套语言包）。 */
-const EFFORT_LABEL_TEXTS = new Set(['推理等级', 'Effort'])
+/** 任意一次扫描命中过 Effort 入口（菜单行或触发按钮）。 */
+let effortUiDetected = false
+/** 「从未识别到入口却发生菜单行点击」的一次性诊断 warn 只发一次。 */
+let unrecognizedMenuWarned = false
+
+/**
+ * 官方 Effort 入口识别文案（中/英两套语言包）。DSH 新增界面语言或官方改措辞时
+ * 在这两张表里追加即可；识别失败不再静默——见 onDocClick 的一次性诊断 warn。
+ */
+const EFFORT_LABELS = ['推理等级', 'Effort'] as const
+const EFFORT_LABEL_TEXTS = new Set<string>(EFFORT_LABELS)
+/** 触发按钮（模型座位）aria-label 里的 Effort 片段（includes 匹配）。 */
+const EFFORT_TRIGGER_ARIA = ['推理等级', 'reasoning effort'] as const
+
+/** 菜单行按前缀匹配（label 在行文本开头）。 */
+const matchesEffortRowText = (text: string): boolean =>
+  EFFORT_LABELS.some((label) => text.startsWith(label))
+/** 触发按钮 aria-label 按片段匹配。 */
+const matchesEffortTriggerAria = (aria: string): boolean =>
+  EFFORT_TRIGGER_ARIA.some((fragment) => aria.includes(fragment))
 
 /**
  * 官方菜单行的档位值 span：行内除了 label 与 chevron svg 外，
@@ -65,22 +80,44 @@ function paintEffortRow(row: HTMLElement, effortId: string): void {
 }
 
 /**
+ * 面板上报的 lastEffortId 与行内档位文本是否仍然一致。面板用过的档位可能已被
+ * 用户从官方入口（/model 弹层）改掉——行内文本才是用户眼前的现实，颜色必须
+ * 跟着文本走，否则「行上写着 Low、颜色还停在 High 的紫」两个信号打架。
+ */
+function lastEffortMatchesText(valueText: string): boolean {
+  const last = uiState.lastEffortId
+  if (last === null || valueText.length === 0) return false
+  const textId = effortIdFromLabel(valueText)
+  if (textId !== null) return textId === canonicalEffortId(last)
+  // 自定义档位名不在别名表里：id 与显示名宽松比对（id 通常是显示名的小写形式）。
+  return last.toLowerCase() === valueText.trim().toLowerCase()
+}
+
+/**
  * 全量扫描文档里的「推理等级」菜单行并涂色。
  * 不依赖任何单节点引用或 mutation 粒度：官方重开菜单（整树原子挂载）、
  * 复用节点改文本、字符数据原地更新，都会在下一次扫描时被覆盖。
+ * 着色依据：行内文本与 lastEffortId 一致时按 lastEffortId；不一致回退文本反推；
+ * 文本也认不出（自定义命名）时清除 inline 色、回退官方原色——宁可失去着色，
+ * 也不沿用可能过期的颜色。
  */
 function paintAllEffortRows(): void {
   for (const row of Array.from(document.querySelectorAll<HTMLElement>('button[role="menuitem"]'))) {
     const text = (row.textContent ?? '').trim()
-    if (!(text.startsWith('推理等级') || text.startsWith('Effort'))) continue
+    if (!matchesEffortRowText(text)) continue
+    effortUiDetected = true
     const value = effortValueSpan(row)
-    // 优先用面板上报的档位；没有时从档位文本反推颜色。
-    if (uiState.lastEffortId !== null) paintEffortRow(row, uiState.lastEffortId)
-    else if (value !== null) {
-      const inferred = effortColorFromLabel((value.textContent ?? '').trim())
+    const valueText = (value?.textContent ?? '').trim()
+    if (uiState.lastEffortId !== null && lastEffortMatchesText(valueText)) {
+      paintEffortRow(row, uiState.lastEffortId)
+    } else if (value !== null) {
+      const inferred = effortColorFromLabel(valueText)
       if (inferred !== null) {
         value.style.color = inferred.color
         value.style.textShadow = inferred.glow ?? 'none'
+      } else {
+        value.style.color = ''
+        value.style.textShadow = ''
       }
     }
   }
@@ -96,20 +133,26 @@ function paintTriggerEffort(): void {
   for (const trigger of Array.from(document.querySelectorAll<HTMLElement>('button[aria-haspopup="menu"]'))) {
     const aria = trigger.getAttribute('aria-label') ?? ''
     // 只有显示档位的触发器才带「推理等级 / reasoning effort」的可访问标签。
-    if (!(aria.includes('推理等级') || aria.includes('reasoning effort'))) continue
+    if (!matchesEffortTriggerAria(aria)) continue
+    effortUiDetected = true
     const spans = Array.from(trigger.querySelectorAll('span'))
     const value = spans[1]
     if (value === undefined) continue
-    if (uiState.lastEffortId !== null) {
+    const valueText = (value.textContent ?? '').trim()
+    // 与菜单行同一套着色依据：文本校验优先，过期档位回退文本反推，再失败回退官方原色。
+    if (uiState.lastEffortId !== null && lastEffortMatchesText(valueText)) {
       const tone = effortColorFor(uiState.lastEffortId)
       value.style.color = tone.color
       value.style.textShadow = tone.glow ?? 'none'
       continue
     }
-    const inferred = effortColorFromLabel((value.textContent ?? '').trim())
+    const inferred = effortColorFromLabel(valueText)
     if (inferred !== null) {
       value.style.color = inferred.color
       value.style.textShadow = inferred.glow ?? 'none'
+    } else {
+      value.style.color = ''
+      value.style.textShadow = ''
     }
   }
 }
@@ -133,6 +176,9 @@ const schedulePaintAll = (): void => {
  */
 export function apply(ctx: ClientContext): void {
   const body = document.body
+  // 每次装配重置识别诊断状态（cordis 配置变更会 dispose 后重新 apply）。
+  effortUiDetected = false
+  unrecognizedMenuWarned = false
 
   const sessions = ctx.get('sessions') as SessionsLike | undefined
   const directories = ctx.get('modelDirectories') as ModelDirectoriesLike | undefined
@@ -147,17 +193,19 @@ export function apply(ctx: ClientContext): void {
   host.style.cssText = 'position: fixed; z-index: 10000; top: 0; left: 0; width: 0; height: 0; pointer-events: none;'
   body.appendChild(host)
   let root: Root | null = null
+  // 当前面板的锚点行（跟随定位与「再次点击收起」的判定用）。
+  let anchorRef: HTMLElement | null = null
 
   const hidePanel = (): void => {
+    anchorRef = null
     root?.unmount()
     root = null
     // 面板关闭后补涂一次：操作期间官方可能已重渲染菜单行。
     schedulePaintAll()
   }
 
-  const showPanel = (sessionId: string, anchor: HTMLElement): void => {
-    const rect = anchor.getBoundingClientRect()
-    // 面板 280 宽、约 150 高；视口内定位，下方不够时弹到锚点上方。
+  /** 按锚点矩形把面板摆进视口（下方不够时弹到锚点上方）。 */
+  const placePanelAt = (rect: DOMRect): void => {
     const left = Math.max(8, Math.min(rect.right - PANEL_W, window.innerWidth - PANEL_W - 8))
     const spaceBelow = window.innerHeight - rect.bottom
     const top = spaceBelow >= PANEL_H + 16
@@ -165,6 +213,31 @@ export function apply(ctx: ClientContext): void {
       : Math.max(8, rect.top - PANEL_H - 8)
     host.style.left = `${left}px`
     host.style.top = `${top}px`
+  }
+
+  /**
+   * scroll/resize 时的跟随重定位。锚点已卸载（官方菜单关闭即卸载行）或被隐藏
+   * （getBoundingClientRect 全 0，如 display:none）时「重算」没有意义，
+   * 唯一正确行为是直接关面板——这个检查也是跟随逻辑天然要求实现的部分。
+   */
+  const repositionPanel = (): void => {
+    const anchor = anchorRef
+    if (anchor === null || root === null) return
+    if (!anchor.isConnected) {
+      hidePanel()
+      return
+    }
+    const rect = anchor.getBoundingClientRect()
+    if (rect.top === 0 && rect.left === 0 && rect.width === 0 && rect.height === 0) {
+      hidePanel()
+      return
+    }
+    placePanelAt(rect)
+  }
+
+  const showPanel = (sessionId: string, anchor: HTMLElement): void => {
+    anchorRef = anchor
+    placePanelAt(anchor.getBoundingClientRect())
     if (root === null) root = createRoot(host)
     root.render(createElement(EffortPanel, {
       sessionId,
@@ -198,23 +271,48 @@ export function apply(ctx: ClientContext): void {
     if (row instanceof HTMLElement) {
       const text = (row.textContent ?? '').trim()
       // 官方 root 菜单的第二行：label「推理等级」/「Effort」。
-      if (text.startsWith('推理等级') || text.startsWith('Effort')) {
+      if (matchesEffortRowText(text)) {
         event.preventDefault()
         event.stopPropagation()
+        // 面板开着时再点同一行 = 收起（toggle），而不是原地重渲染同位置。
+        if (root !== null && anchorRef === row) {
+          hidePanel()
+          return
+        }
         paintAllEffortRows()
         const current = currentSessionId(sessions)
         if (current !== undefined) showPanel(current, row)
         else console.warn('[effort-slider] no session id')
         return
       }
+      // 识别诊断：点的是菜单行，但此前任何一次扫描都没识别到 Effort 入口
+      // （触发按钮常驻，正常界面在首次扫描就会命中）——官方措辞或界面语言
+      // 很可能已不在已知文案表内，整条拦截链正在静默失效。发一次性 warn
+      // 留下排障线索，而不是让插件无声消失。
+      if (!effortUiDetected && !unrecognizedMenuWarned) {
+        unrecognizedMenuWarned = true
+        console.warn('[effort-slider] a menu item was clicked but the effort row/trigger has never been recognized — official wording or UI language may have changed and interception/coloring are inactive (known labels: 推理等级 / Effort)')
+      }
     }
     hidePanel()
   }
   document.addEventListener('click', onDocClick, true)
 
+  // Esc 关闭面板（不阻断传播：官方菜单的 Esc 关闭行为照常）。
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape' && root !== null) hidePanel()
+  }
+  document.addEventListener('keydown', onKeyDown, true)
+  // 面板打开期间跟随滚动/窗口变化（capture：scroll 不冒泡，只有捕获能拿到）。
+  window.addEventListener('scroll', repositionPanel, true)
+  window.addEventListener('resize', repositionPanel)
+
   ctx.effect(
     () => () => {
       document.removeEventListener('click', onDocClick, true)
+      document.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('scroll', repositionPanel, true)
+      window.removeEventListener('resize', repositionPanel)
       paintObserver?.disconnect()
       uiState.lastEffortId = null
       hidePanel()

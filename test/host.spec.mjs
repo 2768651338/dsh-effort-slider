@@ -5,6 +5,7 @@
 import {
   DIALECT_KEYS,
   buildProvisionOps,
+  dialectAppliesNote,
   isOurInjection,
   universalReasoning,
   wireFor,
@@ -62,10 +63,41 @@ assert(ops4[0].path.at(-1) === 'models', 'whole-array op targets models')
 const m1 = ops4[0].value[0]
 assert(m1.compat.thinkingFormat === 'deepseek' && m1.compat.supportsReasoningEffort === true, 'compat updated to deepseek')
 
+// ---- P3-1：buildProvisionOps 产出逐模型决策（debugReport 明细的数据源） ----
+const decisions = []
+const opsR = await buildProvisionOps(
+  'rtR', profile, 'effort',
+  (id) => (id === 'm1' ? 'openai-completions' : undefined),
+  [], undefined,
+  (d) => decisions.push(d),
+)
+assert(opsR.length === 1 && json(opsR[0].path) === json(['providers', 'rtR', 'models']), 'decisions do not change op generation (whole-array op unchanged)')
+assert(decisions.length === 3, 'models branch emits one decision per model')
+assert(decisions[0].route === 'rtR' && decisions[0].dialect === 'effort', 'decisions carry route + dialect context')
+assert(decisions[0].model === 'm1' && decisions[0].action === 'write' && json(decisions[0].fields) === json(['reasoningEfforts', 'compat']) && decisions[0].api === 'openai-completions', 'm1 decision: write reasoningEfforts + compat (api resolved)')
+assert(decisions[1].model === 'm2' && decisions[1].action === 'skip-user-false' && decisions[1].fields === undefined, 'm2 decision: skip user-declared false')
+assert(decisions[2].model === 'm3' && decisions[2].action === 'skip-user-custom', 'm3 decision: skip user-declared custom dictionary')
+
+// 目录分支：原生 reasoning 的跳过也如实报告
+const decisionsC = []
+await buildProvisionOps('rtC', { modelOverrides: {} }, 'deepseek', () => 'openai-completions', ['a', 'b'], (id) => id === 'b', (d) => decisionsC.push(d))
+assert(decisionsC.some((d) => d.model === 'b' && d.action === 'skip-native-reasoning'), 'catalog model b reported as skip-native-reasoning')
+assert(decisionsC.find((d) => d.model === 'a')?.action === 'write', 'catalog model a reported as write')
+
+// 幂等轮：全部 skip-current（空轮也有完整明细可看）
+const decisionsI = []
+await buildProvisionOps('rtI', already, 'effort', () => 'openai-completions', [], undefined, (d) => decisionsI.push(d))
+assert(decisionsI.length === 1 && decisionsI[0].action === 'skip-current', 'idempotent round reports skip-current')
+
 // ---- isOurInjection ----
 assert(isOurInjection({ off: null, low: 'low', medium: 'medium', high: 'high', max: 'max' }) === true, 'recognizes own injection')
 assert(isOurInjection({ off: null, low: 'x' }) === false, 'user dict not ours')
 assert(isOurInjection(false) === false && isOurInjection(undefined) === false, 'false/undefined not ours')
+
+// ---- P3-2：方言适用性备注（compat 只作用于显式声明的 openai-completions）----
+assert(dialectAppliesNote('openai-completions') === undefined, 'no note when the model runs openai-completions (P3-2)')
+assert((dialectAppliesNote('anthropic-messages') ?? '').includes('api=anthropic-messages'), 'note names the resolved api for other protocols (P3-2)')
+assert((dialectAppliesNote(undefined) ?? '').includes('none found'), 'note explains the undeclared-api case (P3-2)')
 
 console.log(failures === 0 ? 'ALL HOST SPECS PASSED' : failures + ' SPEC(S) FAILED')
 process.exit(failures === 0 ? 0 : 1)
