@@ -116,6 +116,7 @@ const clientConfig: UserConfig = {
   }],
   outputOptions: {
     entryFileNames: 'client.js',
+    sourcemapExcludeSources: true,
     banner: 'window.__ModuleLoader__.load({ id: ' + JSON.stringify(ID) + ', factory: (require) => {',
     footer: 'return module.exports; } });',
     intro: 'var module = { exports: {} }; var exports = module.exports;',
