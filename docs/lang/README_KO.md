@@ -36,7 +36,7 @@
 
 ---
 
-> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** 호환: volatile 설정 즉시 반영, 리비전 검사 쓰기, `RemoteResult` 오류 처리, 중첩 모델 이름 및 메뉴 포커스 수정. 공식 패키지와 격리된 픽스처로 검증.
+> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** 호환: volatile 설정, 리비전 검사, `RemoteResult`, 모델 이름 및 포커스 수정. 패키지 이름과 클라이언트 등록 이름을 통일. `pnpm test:live`로 실제 DSH와 브라우저에서 검증.
 >
 > 🆕 **v0.5.0** — 평가 수정 배치. 신뢰성: 패널이 로드 중 / 로드 실패 / 미지원을 세 상태로 분리하고 재시도 버튼을 제공; 슬라이더 쓰기 실패 시 헤더 상태가 잠시 빨갛게 표시되어 조용히 실패하지 않음; 공급 중 사용자 설정 동시 편집을 감지(`mutate` 전에 항목을 재판독, 충돌 라운드는 양보); 호스트 공급의 모든 실패 경로가 경고를 기록하고, 인식되지 않은 Effort 행은 1회성 진단을 출력. 패널 UX: 스크롤/리사이즈에 따라 재배치되고, Esc / 외부 클릭 / 앵커 언마운트 시 닫히며, Effort 행을 다시 누르면 토글; 눈금 점과 레이블이 실제 스냅 위치에 정렬; 슬라이더에 `aria-label` / `aria-valuetext` 제공, UI 문구는 이중 언어(zh/en, `<html lang>` 따름). 새 옵션 `debugReport`: 라우트/모델별 공급 상세와 선택적 읽기 전용 `llm/stream` 트레이서가 요청별로 route/model/effort를 기록; 패널 헤더의 `?` 도움말은 `enabled` / 다이얼렉트 / `debugReport` 점검 절차를 안내. 그 외: GitHub Actions CI(typecheck + 테스트 + 빌드 + 산출물 신선도 게이트) 추가; 패널이 열려 있어도 보이지 않는 WebGL 불꽃은 60fps로 헛돌지 않음; npm 패키지명이 `@txc2768651338/dsh-effort-slider`로 변경(구 스코프 없는 이름 `dsh-effort-slider` 폐지).
 >
@@ -214,7 +214,8 @@ test/                      host.spec.mjs 호스트 단위 + host-apply.spec.mjs 
 pnpm install
 pnpm build       # tsdown → lib/index.js（호스트 측） + lib/client.js（브라우저 측）
 pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.2.1-rc.2 기준 그린）
-pnpm test        # 호스트 단위 + apply 통합 + 실제 이음세 통합 + jsdom 스모크
+pnpm test        # 패키지 이름, 재현 가능한 빌드, 순수 프로비저닝 로직
+pnpm test:live   # 실제 DSH와 브라우저 (Chromium 설치 필요; Windows는 Edge 사용)
 ```
 
 `test/` 4계층, 저렴한 순서:
@@ -222,9 +223,11 @@ pnpm test        # 호스트 단위 + apply 통합 + 실제 이음세 통합 + j
 | 파일 | 커버 범위 |
 | --- | --- |
 | `host.spec.mjs` | 순수 로직: 다이얼렉트 → 와이어 매핑, 프로비저닝 패치 생성, 멱등성 |
-| `host-apply.spec.mjs` | mock cordis 컨텍스트에서의 `apply()`: pi-ai entry 지연 등록 재시도, 선언된 프로토콜에 따른 `compat` 게이팅, `settings/document-updated` 멱등성 |
-| `host-integration.spec.mjs` | **실제 이음세**: 실제 `@deepseek-ai/cordis` + 충실한 `SettingsForms` 이음세 테스트 더블（0.2.0의 npm 패키지에는 독립 프로바이더가 없음）— entry 탐색, 실제 path-op의 profile entry 설정 기록, 기록된 `reasoningEfforts`/`compat`가 pi-ai 검증 규칙 통과 |
-| `client.smoke.mjs` | jsdom: 번들 팩토리 실체화, Effort 행 인터셉트, 패널 렌더, `directory.select` 경유 드래그/스냅 기록, 색칠, 언마운트 회수 |
+| `package-config.spec.mjs` | 실제 bundle YAML의 패키지 이름 검증 |
+| `build-determinism.mjs` | 서로 다른 경로에서 빌드한 산출물을 바이트 단위로 비교 |
+| `live-profile.spec.mjs` | DSH 0.2.1-rc.2 설치 후 실제 UI, 저장, 실시간 설정 변경 검증 |
+
+CI는 두 명령을 모두 실행합니다. 실행 환경, profile, 스크린샷은 `output/`에 저장하며 모델 생성 요청은 보내지 않습니다. 기존 테스트 더블은 릴리스 검증에서 제외합니다.
 
 **기여.** Fork → 수정 → `pnpm build` → `pnpm test` 실행 → `main`으로 PR. 사소한 수정（문서, 테스트）은 사전 협의 없이 환영합니다. 이슈에는 DSH 버전과 구체적 오류를 첨부하세요.
 

@@ -26,6 +26,7 @@
  * 供给全走 pi-ai 的 reasoningEfforts 声明这一条路径。
  */
 import type { Context } from '@deepseek-ai/cordis'
+import type { AsyncLocalStorage } from 'node:async_hooks'
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { SettingsForms } from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
@@ -348,7 +349,7 @@ export function apply(ctx: Context, config?: ConfigInput): void {
 
   let provisionTail: Promise<void> = Promise.resolve()
   let queued = false
-  const provision = (): Promise<void> => {
+  const enqueueProvision = (): Promise<void> => {
     if (disposed) return Promise.resolve()
     queued = true
     provisionTail = provisionTail.then(async () => {
@@ -361,6 +362,20 @@ export function apply(ctx: Context, config?: ConfigInput): void {
       ctx.logger.warn(error)
     })
     return provisionTail
+  }
+
+  const provision = (): Promise<void> => {
+    if (disposed) return Promise.resolve()
+    // DSH 0.2.1 emits live-config events inside HMR's AsyncLocalStorage scope.
+    // Even a deferred .then() inherits that scope and SettingsForms rejects the
+    // nested transaction. Leave only that async scope before enqueueing; the
+    // actual write still uses SettingsForms and waits in HMR's exclusive queue.
+    // `executing` is the current HMR runtime's internal transaction context;
+    // feature-detect it to retain compatibility with runtimes without HMR.
+    const hmr = ctx.get('hmr') as { executing?: Pick<AsyncLocalStorage<unknown>, 'exit'> } | undefined
+    return typeof hmr?.executing?.exit === 'function'
+      ? hmr.executing.exit(enqueueProvision)
+      : enqueueProvision()
   }
 
   // ---- 2. 事件联动 ----

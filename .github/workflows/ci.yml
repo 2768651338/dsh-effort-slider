@@ -24,3 +24,7 @@ jobs:
       # 忘记 build 就 push 会把旧产物发给用户——产物不新鲜即失败。
       - name: lib/ artifacts must be fresh
         run: git diff --exit-code lib/
+      - name: Install browser for live DSH validation
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Validate the installed plugin in real DSH
+        run: pnpm test:live

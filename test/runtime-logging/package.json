@@ -1,0 +1,5 @@
+{
+  "name": "dsh-release-runtime-logging",
+  "private": true,
+  "type": "module"
+}

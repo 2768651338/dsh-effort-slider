@@ -36,7 +36,7 @@ Clique na linha **Effort** (segunda linha do menu de modelos oficial) em vez da 
 
 ---
 
-> 🔧 **v0.5.1** — Compatibilidade com DSH **0.2.1-rc.2**: configurações volatile em tempo real, gravações com revisão, falhas `RemoteResult`, nomes aninhados e foco do menu. Verificado com pacotes oficiais e fixtures isolados.
+> 🔧 **v0.5.1** — Compatibilidade com DSH **0.2.1-rc.2**: configurações volatile, revisão, falhas `RemoteResult`, nomes e foco. O nome do pacote coincide com o registro do cliente. `pnpm test:live` valida o aplicativo DSH real no navegador.
 >
 > 🆕 **v0.5.0** — Lote de correções da avaliação. Confiabilidade: o painel separa carregando / falha de carregamento / não suportado em três estados com botão de repetição; gravações falhas do slider exibem um estado vermelho transitório em vez de falhar em silêncio; edições concorrentes do usuário são detectadas (a entrada é relida antes de `mutate`, rodadas em conflito cedem a vez); todos os caminhos de falha do provisionamento do host agora registram um aviso, e uma linha Effort nunca reconhecida gera um diagnóstico único. UX do painel: reancora em scroll/resize, fecha com Esc / clique fora / desmontagem da âncora, e clicar novamente na linha Effort a alterna; pontos e rótulos da escala ficam alinhados aos pontos reais de encaixe; o slider carrega `aria-label` / `aria-valuetext`; os textos da UI são bilíngues (zh/en, seguindo `<html lang>`). Nova opção `debugReport`: detalhamento de provisionamento por rota/modelo mais um rastreador opcional de somente leitura `llm/stream` que registra rota/modelo/effort por requisição; uma dica `?` no cabeçalho do painel aponta para `enabled` / dialeto / `debugReport`. Além disso: CI com GitHub Actions (typecheck + testes + build + gate de frescor de artefatos), o fogo WebGL não queima mais a 60 fps quando invisível, e o pacote npm passa a se chamar `@txc2768651338/dsh-effort-slider` (o antigo nome sem escopo `dsh-effort-slider` é aposentado).
 >
@@ -216,7 +216,8 @@ test/                      testes unitários host.spec.mjs + host-apply.spec.mjs
 pnpm install
 pnpm build       # tsdown → lib/index.js (metade host) + lib/client.js (metade navegador)
 pnpm typecheck   # tsc --noEmit (verde contra @deepseek-ai/* 0.2.1-rc.2)
-pnpm test        # unitários do host + integração apply + integração de costura real + smoke jsdom
+pnpm test        # identidade do pacote, build reproduzível e lógica pura
+pnpm test:live   # DSH real e navegador (instalar Chromium; Windows usa Edge)
 ```
 
 Camadas de `test/`, da mais barata para a mais cara:
@@ -224,9 +225,11 @@ Camadas de `test/`, da mais barata para a mais cara:
 | Arquivo | Escopo |
 | --- | --- |
 | `host.spec.mjs` | Lógica pura: mapeamento dialeto → protocolo, geração de patches de provisionamento, idempotência |
-| `host-apply.spec.mjs` | `apply()` contra um contexto cordis mockado: retry por registro tardio da entry do pi-ai, gating de `compat` pelo protocolo declarado, idempotência de `settings/document-updated` |
-| `host-integration.spec.mjs` | **Costura real**: `@deepseek-ai/cordis` real + um double fiel da costura `SettingsForms` (os pacotes npm do 0.2.0 não têm provedor independente) — descoberta da entry, gravações path-op reais pousando na configuração de profile entry, e o `reasoningEfforts`/`compat` gravado passando nas regras de validação do pi-ai |
-| `client.smoke.mjs` | jsdom: materialização da fábrica do bundle, interceptação da linha Effort, render do painel, gravações de arraste/ajuste via `directory.select`, coloração, limpeza no unmount |
+| `package-config.spec.mjs` | Identidade do pacote no YAML real do bundle |
+| `build-determinism.mjs` | Compara byte a byte os builds em dois diretórios |
+| `live-profile.spec.mjs` | Instala DSH 0.2.1-rc.2 e verifica a interface real, persistência e alterações ao vivo |
+
+CI executa os dois comandos. Ambiente, perfil e capturas ficam em `output/`; nenhuma solicitação de geração é enviada. Os testes históricos com doubles ficam fora da validação de lançamento.
 
 **Contribuir.** Fork → mudar → `pnpm build` → rodar `pnpm test` → abrir um PR contra `main`. Correções pequenas (docs, testes) são bem-vindas sem discussão prévia; reporte issues com a versão do DSH e o erro exato.
 

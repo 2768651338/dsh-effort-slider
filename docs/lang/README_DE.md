@@ -36,7 +36,7 @@ Klicke auf die **Effort**-Zeile (zweite Zeile des offiziellen Modellmenüs) stat
 
 ---
 
-> 🔧 **v0.5.1** — Kompatibel mit DSH **0.2.1-rc.2**: volatile Einstellungen ohne Remount, revisionsgeprüfte Schreibvorgänge, `RemoteResult`-Fehler, verschachtelte Modellnamen und Menüfokus. Geprüft mit offiziellen Paketen und isolierten Fixtures.
+> 🔧 **v0.5.1** — Kompatibel mit DSH **0.2.1-rc.2**: volatile Einstellungen, Revisionsprüfung, `RemoteResult`, Modellnamen und Menüfokus. Paketname und Client-Registrierung stimmen überein. `pnpm test:live` prüft die echte DSH-Anwendung im Browser.
 >
 > 🆕 **v0.5.0** — Evaluierungs-Fix-Batch. Zuverlässigkeit: das Panel unterscheidet jetzt „Lädt / Laden fehlgeschlagen / nicht unterstützt“ mit Retry-Button; fehlgeschlagene Slider-Schreibvorgänge zeigen kurz einen roten Status statt still zu scheitern; gleichzeitige Bearbeitungen der Nutzerkonfiguration werden erkannt (der Entry wird vor `mutate` neu gelesen, kollidierende Runden weichen aus); jeder Fehlerpfad der Host-Bereitstellung protokolliert jetzt eine Warnung, und eine nie erkannte Effort-Zeile erzeugt eine einmalige Diagnose. Panel-UX: verankert sich bei Scroll/Resize neu, schließt bei Esc / Klick außerhalb / Unmount des Ankers, ein erneuter Klick auf die Effort-Zeile schaltet sie um; Skalenpunkte und Labels liegen an den echten Einrastpunkten; der Slider trägt `aria-label` / `aria-valuetext`; die UI-Texte sind zweisprachig (zh/en, folgt `<html lang>`). Neue Option `debugReport`: Bereitstellungsdetails pro Route/Modell plus ein optionaler nur-lesender `llm/stream`-Tracer, der pro Anfrage Route/Modell/Effort protokolliert; ein `?`-Hinweis im Panel-Header zeigt auf `enabled` / Dialekt / `debugReport`. Außerdem: GitHub-Actions-CI (Typecheck + Tests + Build + Frischheits-Gate), die WebGL-Flamme brennt nicht mehr mit 60 fps, solange sie unsichtbar ist, und das npm-Paket heißt jetzt `@txc2768651338/dsh-effort-slider` (der alte Name ohne Scope, `dsh-effort-slider`, wurde eingestellt).
 >
@@ -216,7 +216,8 @@ test/                      host.spec.mjs Unit-Tests + host-apply.spec.mjs + clie
 pnpm install
 pnpm build       # tsdown → lib/index.js (Host-Hälfte) + lib/client.js (Browser-Hälfte)
 pnpm typecheck   # tsc --noEmit (grün gegen @deepseek-ai/* 0.2.1-rc.2)
-pnpm test        # Host-Unit-Tests + Apply-Integrationstest + echte-Naht-Integrationstest + jsdom-Smoke
+pnpm test        # Paketname, reproduzierbarer Build und reine Provisioning-Logik
+pnpm test:live   # Echte DSH-Anwendung und Browser (Chromium installieren; Windows nutzt Edge)
 ```
 
 `test/`-Schichten, vom billigsten zuerst:
@@ -224,9 +225,11 @@ pnpm test        # Host-Unit-Tests + Apply-Integrationstest + echte-Naht-Integra
 | Datei | Umfang |
 | --- | --- |
 | `host.spec.mjs` | Reine Logik: Dialekt → Wire-Mapping, Provisioning-Patch-Erzeugung, Idempotenz |
-| `host-apply.spec.mjs` | `apply()` gegen einen gemockten cordis-Kontext: Retry bei später Registrierung des pi-ai-Entrys, `compat`-Gating nach deklariertem Protokoll, `settings/document-updated`-Idempotenz |
-| `host-integration.spec.mjs` | **Echte Naht**: echtes `@deepseek-ai/cordis` + ein getreues `SettingsForms`-Naht-Double (die npm-Pakete von 0.2.0 haben keinen eigenständigen Provider) — Entry-Auffindung, echte Path-Op-Schreibvorgänge, die in der Profile-Entry-Konfiguration landen, und das geschriebene `reasoningEfforts`/`compat` besteht pi-ais Validierungsregeln |
-| `client.smoke.mjs` | jsdom: Materialisierung der Bundle-Factory, Abfangen der Effort-Zeile, Panel-Render, Drag/Snap-Schreibvorgänge über `directory.select`, Färbung, Aufräumen beim Unmount |
+| `package-config.spec.mjs` | Paketidentität aus dem echten YAML-Bundle prüfen |
+| `build-determinism.mjs` | Artefakte aus zwei Verzeichnissen byteweise vergleichen |
+| `live-profile.spec.mjs` | DSH 0.2.1-rc.2 installieren und die echte Oberfläche, Speicherung und Live-Updates prüfen |
+
+CI führt beide Befehle aus. Laufzeit, Profil und Screenshots liegen unter `output/`; es werden keine Modellanfragen gesendet. Historische Fixture-Tests gehören nicht zur Release-Prüfung.
 
 **Beitragen.** Fork → ändern → `pnpm build` → `pnpm test` ausführen → PR gegen `main` öffnen. Kleine Fixes (Doku, Tests) sind ohne vorherige Absprache willkommen; Issues mit DSH-Version und exakter Fehlermeldung melden.
 

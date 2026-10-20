@@ -34,7 +34,8 @@
     "build": "tsdown --config ./tsdown.config.ts",
     "watch": "tsdown --config ./tsdown.config.ts --watch",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node test/host.spec.mjs"
+    "test": "node test/package-config.spec.mjs && node test/build-determinism.mjs && node test/host.spec.mjs",
+    "test:live": "node test/live-profile.spec.mjs"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.5",
@@ -53,6 +54,7 @@
     "immer": "^10.2.0",
     "jsdom": "^30.0.1",
     "lightningcss": "^1.33.0",
+    "playwright": "^1.64.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "tsdown": "^0.22.14",

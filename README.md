@@ -30,7 +30,7 @@ Click the **Effort** row (second row of the official model menu) instead of the 
 
 ---
 
-> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** compatibility: volatile settings with live updates, revision-checked provisioning, resolved `RemoteResult` failures, nested model-label slots, menu focus/blur integration, and safe handling of unavailable models and Session changes. Includes tests using the official SettingsForms, ModelSelect and ModelDirectory packages with isolated fixtures.
+> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** compatibility: volatile settings with live updates, revision-checked provisioning, resolved `RemoteResult` failures, nested model-label slots, menu focus/blur integration, and safe handling of unavailable models and Session changes. The bundle patch and client registration now use the same scoped package name. Live provisioning queues settings writes outside the active HMR transaction; CSS names and source maps stay stable across checkout paths. Includes real DSH browser validation.
 >
 > 🆕 **v0.5.0** — Evaluation-fix batch. Reliability: the panel splits loading / load-failed / unsupported into three states with a retry button; failed slider writes surface a transient red status instead of failing silently; user config edits made mid-provision are detected (the entry is re-read before `mutate`, conflicting rounds defer); every host provisioning failure path now logs a warning, and an unrecognized Effort row produces a one-time diagnostic. Panel UX: re-anchors on scroll/resize, closes on Esc / outside click / anchor unmount, and clicking the Effort row toggles it; tick dots and labels align with the real snap points; the slider carries `aria-label` / `aria-valuetext`; UI text is bilingual (zh/en, follows `<html lang>`). New `debugReport` option: per-route/per-model provisioning detail plus an optional read-only `llm/stream` tracer logging route/model/effort per request; a `?` help hint in the panel header points at `enabled` / dialect / `debugReport`. Also: GitHub Actions CI (typecheck + tests + build + stale-artifact gate), the WebGL fire no longer burns at 60 fps while invisible, and the npm package is renamed to `@txc2768651338/dsh-effort-slider` (the old unscoped `dsh-effort-slider` name is retired).
 >
@@ -220,21 +220,23 @@ test/                      host.spec.mjs unit tests + host-apply.spec.mjs + clie
 pnpm install
 pnpm build       # tsdown → lib/index.js (host half) + lib/client.js (browser half)
 pnpm typecheck   # tsc --noEmit (green against @deepseek-ai/* 0.2.1-rc.2)
-pnpm test        # six suites, including the official DSH settings/model UI compatibility checks
+pnpm test        # package identity, reproducible builds, and pure provisioning logic
+pnpm exec playwright install chromium # once, when Chromium is not installed (Windows uses Edge)
+pnpm test:live   # install this package into the published DSH app and operate its real browser UI
 ```
 
 `test/` layers, cheapest first:
 
 | File | Scope |
 | --- | --- |
+| `package-config.spec.mjs` | Parse the actual bundle YAML with the YAML library and check its distribution package identity |
+| `build-determinism.mjs` | Build unchanged sources in two workspace directories and compare all three artifacts byte for byte |
 | `host.spec.mjs` | Pure logic: dialect → wire mapping, provisioning patch generation, idempotency |
-| `host-apply.spec.mjs` | `apply()` against a mocked cordis context: late pi-ai entry retry, `compat` gating on the declared protocol, `settings/document-updated` idempotency |
-| `host-integration.spec.mjs` | **Real seam**: real `@deepseek-ai/cordis` + a faithful `SettingsForms` seam double (0.2.0's npm packages have no standalone provider) — entry discovery, real path-op writes landing in the profile entry config, and the written `reasoningEfforts`/`compat` passing pi-ai's validation rules |
-| `client.smoke.mjs` | jsdom: bundle factory materialization, Effort-row interception, panel render, drag/snap writes through `directory.select`, coloring, teardown |
-| `settings-compat.spec.mjs` | Published 0.2.1-rc.2 `SettingsForms` with in-memory Loader/editor fixtures: volatile fields, revision conflicts, live disable and dialect changes |
-| `dsh-compat.spec.mjs` | Published 0.2.1-rc.2 `ModelSelect`, `ModelDirectory` and snapshot store in jsdom; fixture transport/primitives: native focus/blur, RemoteResult refusals, nested labels, unavailable models, Session changes and teardown |
+| `live-profile.spec.mjs` | Launch published DSH 0.2.1-rc.2, install this package with its CLI, and operate the real UI in Edge/Chromium: scoped client boot, settings persistence, keyboard/focus behavior, reload, a narrow viewport, and live dialect updates |
 
-These checks use isolated fixtures. They do not replace installing the plugin into a running DSH Desktop or sending a real provider request.
+CI runs both test commands. Live validation stores its runtime, profile, screenshots and report under ignored `output/`; it checks configuration, the model directory and Session selection without sending a model generation request. Historical fixture tests are excluded from the release checks.
+
+The hot-update bridge feature-detects DSH 0.2.1's internal HMR transaction context before enqueueing work. Settings writes still use the revision-checked public API and its exclusive queue. The live test pins DSH 0.2.1-rc.2 so changes to that internal context are caught when updating the supported version.
 
 **Contributing.** Fork → change → `pnpm build` → run `pnpm test` → open a PR against `main`. Small fixes (docs, tests) are welcome without prior discussion; report issues with the DSH version and the exact error.
 

@@ -36,7 +36,7 @@ Haz clic en la fila **Effort** (segunda fila del menú de modelos oficial) en lu
 
 ---
 
-> 🔧 **v0.5.1** — Compatibilidad con DSH **0.2.1-rc.2**: configuración volatile en vivo, escrituras con revisión, errores `RemoteResult`, etiquetas anidadas y foco del menú. Verificación con paquetes oficiales y fixtures aislados.
+> 🔧 **v0.5.1** — Compatibilidad con DSH **0.2.1-rc.2**: configuración volatile, escrituras con revisión, errores `RemoteResult`, etiquetas y foco. Se unifican el nombre del paquete y el registro del cliente. `pnpm test:live` valida la aplicación DSH real en el navegador.
 >
 > 🆕 **v0.5.0** — Lote de correcciones de la evaluación. Fiabilidad: el panel separa cargando / error de carga / no compatible en tres estados con botón de reintento; las escrituras fallidas del deslizador muestran un estado rojo transitorio en lugar de fallar en silencio; las ediciones concurrentes del usuario se detectan (la entrada se relee antes de `mutate`, las rondas en conflicto ceden el paso); todas las rutas de fallo del aprovisionamiento del host registran ahora una advertencia, y una fila Effort nunca reconocida genera un diagnóstico único. UX del panel: se reancla con scroll/resize, se cierra con Esc / clic fuera / desmontaje del ancla, y pulsar de nuevo la fila Effort la alterna; los puntos y etiquetas de la escala se alinean con los puntos reales de ajuste; el deslizador lleva `aria-label` / `aria-valuetext`; los textos de la UI son bilingües (zh/en, según `<html lang>`). Nueva opción `debugReport`: detalle de aprovisionamiento por ruta/modelo más un trazador opcional de solo lectura `llm/stream` que registra ruta/modelo/effort por petición; una ayuda `?` en la cabecera del panel apunta a `enabled` / dialecto / `debugReport`. Además: CI con GitHub Actions (typecheck + tests + build + puerta de frescura de artefactos), el fuego WebGL ya no arde a 60 fps cuando es invisible, y el paquete npm pasa a llamarse `@txc2768651338/dsh-effort-slider` (el antiguo nombre sin scope `dsh-effort-slider` se retira).
 >
@@ -216,7 +216,8 @@ test/                      pruebas unitarias host.spec.mjs + host-apply.spec.mjs
 pnpm install
 pnpm build       # tsdown → lib/index.js (mitad host) + lib/client.js (mitad navegador)
 pnpm typecheck   # tsc --noEmit (en verde contra @deepseek-ai/* 0.2.1-rc.2)
-pnpm test        # unitarias del host + integración apply + integración de costura real + smoke jsdom
+pnpm test        # identidad del paquete, compilación reproducible y lógica pura
+pnpm test:live   # DSH real y navegador (instalar Chromium; Windows usa Edge)
 ```
 
 Capas de `test/`, de la más barata a la más costosa:
@@ -224,9 +225,11 @@ Capas de `test/`, de la más barata a la más costosa:
 | Archivo | Alcance |
 | --- | --- |
 | `host.spec.mjs` | Lógica pura: mapeo dialecto → cable, generación de parches de aprovisionamiento, idempotencia |
-| `host-apply.spec.mjs` | `apply()` contra un contexto cordis simulado: reintento por registro tardío de la entry de pi-ai, control de `compat` según el protocolo declarado, idempotencia de `settings/document-updated` |
-| `host-integration.spec.mjs` | **Costura real**: `@deepseek-ai/cordis` real + un doble fiel de la costura `SettingsForms` (los paquetes npm de 0.2.0 no tienen proveedor independiente) — descubrimiento de la entry, escrituras path-op reales aterrizando en la configuración de profile entry, y el `reasoningEfforts`/`compat` escrito pasando las reglas de validación de pi-ai |
-| `client.smoke.mjs` | jsdom: materialización de la factoría del bundle, intercepción de la fila Effort, render del panel, escrituras de arrastre/ajuste vía `directory.select`, coloreado, limpieza al desmontar |
+| `package-config.spec.mjs` | Identidad del paquete leyendo el YAML real del bundle |
+| `build-determinism.mjs` | Comparación byte a byte de compilaciones en dos directorios |
+| `live-profile.spec.mjs` | Instala DSH 0.2.1-rc.2 y verifica la interfaz real, persistencia y cambios en vivo |
+
+CI ejecuta ambos comandos. El entorno, perfil y capturas se guardan en `output/`; no se envían solicitudes de generación. Las pruebas históricas con dobles se excluyen de la validación del lanzamiento.
 
 **Contribuir.** Fork → cambiar → `pnpm build` → ejecutar `pnpm test` → abrir un PR contra `main`. Los arreglos pequeños (documentación, pruebas) son bienvenidos sin discusión previa; reporta issues con la versión de DSH y el error exacto.
 

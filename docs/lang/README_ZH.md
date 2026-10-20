@@ -40,7 +40,7 @@
 
 ---
 
-> 🔧 **v0.5.1** — 适配 DSH **0.2.1-rc.2**：配置改为 volatile 字段并即时生效；供给写入携带修订号；正确处理 `RemoteResult` 失败；修复嵌套模型名导致的档位着色偏移和菜单焦点/失焦问题；会话切换、模型失效时关闭或禁用旧面板。新增官方 SettingsForms、ModelSelect、ModelDirectory 的隔离夹具集成验证。
+> 🔧 **v0.5.1** — 适配 DSH **0.2.1-rc.2**：配置改为 volatile 字段；供给写入携带修订号；正确处理 `RemoteResult` 失败；修复档位着色、菜单焦点和旧会话面板。统一 bundle patch 与客户端的带 scope 包名，修复启动失败；热更新时通过 DSH 设置队列在当前 HMR 事务之后写入。保留跨目录构建一致性修复，并新增完整 DSH 程序的真实浏览器验收。
 >
 > 🆕 **v0.5.0** — 评估修复批次。可靠性：面板将「加载中 / 加载失败 / 不支持」拆分为三分支状态并附重试按钮；滑杆写入失败时 header 状态短暂变红而非静默；供给途中检测用户并发编辑（`mutate` 前重读条目，冲突轮让路）；宿主供给全部失败路径均落告警，Effort 行从未被识别时输出一次性诊断。面板交互：跟随滚动/窗口变化重新定位，Esc / 点击外部 / 锚点卸载时关闭，再次点击 Effort 行可收起；刻度点与标签对齐真实吸附位置；滑杆带 `aria-label` / `aria-valuetext`；UI 文案双语（zh/en，跟随 `<html lang>`）。新增 `debugReport` 选项：逐路由逐模型供给明细，并可选只读 `llm/stream` 追踪逐请求记录 route/model/effort；面板 header 的「?」提示指向 `enabled` / 方言 / `debugReport` 排查链路。另外：新增 GitHub Actions CI（typecheck + 测试 + 构建 + 产物新鲜度门禁）；面板开着但不可见时 WebGL 火焰不再 60fps 空烧；npm 包更名为 `@txc2768651338/dsh-effort-slider`（旧无 scope 名 `dsh-effort-slider` 弃用）。
 >
@@ -230,21 +230,23 @@ test/                      host.spec.mjs 宿主单测 + host-apply.spec.mjs + cl
 pnpm install
 pnpm build       # tsdown → lib/index.js（宿主半区）+ lib/client.js（浏览器半区）
 pnpm typecheck   # tsc --noEmit（对 @deepseek-ai/* 0.2.1-rc.2 全绿）
-pnpm test        # 六组验证，包含官方 DSH 设置服务与模型界面的兼容性集成检查
+pnpm test        # 包名一致性、跨目录构建一致性、供给纯逻辑
+pnpm exec playwright install chromium # 未安装 Chromium 时执行一次；Windows 默认使用 Edge
+pnpm test:live   # 启动官方 DSH 程序、安装本插件，并操作真实浏览器界面
 ```
 
 `test/` 验证层次：
 
 | 文件 | 覆盖范围 |
 | --- | --- |
+| `package-config.spec.mjs` | 使用 YAML 库读取实际 bundle patch，核对分发包名 |
+| `build-determinism.mjs` | 在两个项目内目录构建原样源码，逐字节对比三份产物 |
 | `host.spec.mjs` | 纯逻辑：方言 → 线级映射、供给补丁生成、幂等 |
-| `host-apply.spec.mjs` | mock cordis 上下文下的 `apply()`：pi-ai entry 晚注册的重试、`compat` 按协议声明门控、`settings/document-updated` 幂等 |
-| `host-integration.spec.mjs` | **真实接缝**：真 `@deepseek-ai/cordis` + 忠实的 `SettingsForms` 接缝替身（0.2.0 的 npm 包没有独立提供方）—— entry 发现、真实 path-op 落盘进 profile entry 配置、写出的 `reasoningEfforts`/`compat` 通过 pi-ai 校验规则 |
-| `client.smoke.mjs` | jsdom：产物工厂材质化、拦截「推理等级」行、面板渲染、拖动/吸附经 `directory.select` 写入、着色、卸载回收 |
-| `settings-compat.spec.mjs` | 官方 0.2.1-rc.2 SettingsForms + 内存 Loader/编辑器夹具：volatile 字段、修订冲突、即时停用与方言更新 |
-| `dsh-compat.spec.mjs` | jsdom 中运行官方 0.2.1-rc.2 ModelSelect、ModelDirectory 和快照 store；传输/基础组件为夹具，覆盖焦点/失焦、RemoteResult 拒绝、嵌套模型标签、失效模型、切换会话和回收 |
+| `live-profile.spec.mjs` | 启动官方 DSH 0.2.1-rc.2、通过 CLI 安装本插件，在 Edge/Chromium 中验证带 scope 的客户端启动、设置落盘、键盘与焦点、刷新恢复、窄屏布局和即时方言更新 |
 
-上述检查使用隔离夹具，不能替代在运行中的 DSH Desktop 内实际安装插件，也未向真实提供方发送请求。
+CI 同时运行两条测试命令。真实验收使用被忽略的 `output/` 保存独立运行时、profile、截图和报告，覆盖配置、模型目录和会话选择，不发送模型生成请求；历史替身测试不纳入发布验证。
+
+热更新桥接会检测 DSH 0.2.1 内部的 HMR 事务上下文，在排队前退出该异步上下文；实际写入仍使用带修订号校验的公开设置 API 及其独占队列。真实测试固定 DSH 0.2.1-rc.2，升级支持版本时需一并验证这项内部契约。
 
 **贡献.** Fork → 修改 → `pnpm build` → 跑 `pnpm test` → 向 `main` 开 PR。小修复（文档、测试）无需事先讨论；报告问题时附 DSH 版本与具体报错。
 

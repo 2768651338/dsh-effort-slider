@@ -2,4 +2,4 @@
 # 点击模型菜单「推理等级」弹出 Effort 滑块面板（无极拖动 + 松手吸附 + WebGL 火焰）。
 - insert:
     - id: ui-effort-slider
-      name: 'dsh-effort-slider'
+      name: '@txc2768651338/dsh-effort-slider'

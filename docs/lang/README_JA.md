@@ -36,7 +36,7 @@
 
 ---
 
-> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** に対応。volatile 設定の即時反映、リビジョン付き書き込み、`RemoteResult` の失敗処理、入れ子のモデル名の着色、メニューのフォーカスを修正。公式パッケージと隔離フィクスチャで検証。
+> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** に対応。volatile 設定、リビジョン付き書き込み、`RemoteResult`、モデル名の着色とフォーカスを修正。スコープ付きパッケージ名とクライアント登録名を統一。`pnpm test:live` は実際の DSH とブラウザーを起動して検証。
 >
 > 🆕 **v0.5.0** — 評価修正バッチ。信頼性：パネルは「読み込み中 / 読み込み失敗 / 非対応」を 3 状態に分けて再試行ボタンを付属；スライダーの書き込み失敗時はヘッダー状態が一瞬赤くなり、サイレント失敗しない；供給中のユーザー設定同時編集を検出（`mutate` 前にエントリを再読み込み、競合ラウンドは譲る）；ホスト供給の全失敗パスが警告を記録し、認識できなかった Effort 行は 1 回だけ診断を出力。パネル操作：スクロール/リサイズに追従して再配置、Esc / 外側クリック / アンカーのアンマウントで閉じ、Effort 行の再クリックでトグル；目盛り点とラベルは実際のスナップ位置に整合；スライダーは `aria-label` / `aria-valuetext` を持ち、UI 文言は二言語（zh/en、`<html lang>` に追従）。新オプション `debugReport`：ルート/モデル別の供給詳細に加え、任意の読み取り専用 `llm/stream` トレーサーがリクエストごとに route/model/effort を記録；パネルヘッダーの「?」ヒントは `enabled` / ダイアレクト / `debugReport` の調査手順を指す。その他：GitHub Actions CI（typecheck + テスト + ビルド + 成果物新鮮度ゲート）を追加；パネル表示中でも不可視の WebGL 炎は 60fps で空焼きしない；npm パッケージは `@txc2768651338/dsh-effort-slider` に改名（旧スコープなし名 `dsh-effort-slider` は廃止）。
 >
@@ -215,7 +215,8 @@ test/                      host.spec.mjs ホスト単体 + host-apply.spec.mjs +
 pnpm install
 pnpm build       # tsdown → lib/index.js（ホスト半区）+ lib/client.js（ブラウザ半区）
 pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.2.1-rc.2 に対してグリーン）
-pnpm test        # ホスト単体 + apply 結合 + リアムシーム結合 + jsdom スモーク
+pnpm test        # パッケージ名、再現可能なビルド、供給の純ロジック
+pnpm test:live   # 実際の DSH とブラウザー（Chromium が必要。Windows は Edge）
 ```
 
 `test/` の 4 層、安価な順に：
@@ -223,9 +224,11 @@ pnpm test        # ホスト単体 + apply 結合 + リアムシーム結合 + j
 | ファイル | カバー範囲 |
 | --- | --- |
 | `host.spec.mjs` | 純ロジック：方言 → ワイヤマッピング、供給パッチ生成、冪等性 |
-| `host-apply.spec.mjs` | mock cordis コンテキストでの `apply()`：pi-ai entry の遅延登録リトライ、宣言プロトコルによる `compat` のゲーティング、`settings/document-updated` の冪等性 |
-| `host-integration.spec.mjs` | **リアルシーム**：実 `@deepseek-ai/cordis` + 忠実な `SettingsForms` シームのテストダブル（0.2.0 の npm パッケージにスタンドアロンのプロバイダーはない）— entry の発見、実 path-op による profile entry 設定への書き込み、書き出された `reasoningEfforts`/`compat` が pi-ai の検証ルールを通ること |
-| `client.smoke.mjs` | jsdom：バンドルファクトリーの実体化、Effort 行のインターセプト、パネル描画、`directory.select` 経由のドラッグ/スナップ書き込み、着色、アンマウント時の回収 |
+| `package-config.spec.mjs` | 実際の bundle YAML からパッケージ名を確認 |
+| `build-determinism.mjs` | 異なるディレクトリで生成した成果物をバイト単位で比較 |
+| `live-profile.spec.mjs` | DSH 0.2.1-rc.2 をインストールし、実際の UI、保存、ライブ更新を確認 |
+
+CI は両方を実行します。実行環境、profile、画像は `output/` に保存し、モデル生成リクエストは送りません。過去のテストダブルはリリース検証に含めません。
 
 **コントリビュート.** Fork → 変更 → `pnpm build` → `pnpm test` を実行 → `main` へ PR。小さな修正（ドキュメント、テスト）は事前相談なしで歓迎します。Issue には DSH バージョンと具体的なエラーを添えてください。
 
