@@ -34,7 +34,7 @@
     "build": "tsdown --config ./tsdown.config.ts",
     "watch": "tsdown --config ./tsdown.config.ts --watch",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node test/package-config.spec.mjs && node test/host.spec.mjs && node test/host-apply.spec.mjs && node test/host-integration.spec.mjs && node test/client.smoke.mjs"
+    "test": "node test/package-config.spec.mjs && node test/build-determinism.mjs && node test/host.spec.mjs && node test/host-apply.spec.mjs && node test/host-integration.spec.mjs && node test/client.smoke.mjs"
   },
   "devDependencies": {
     "jsdom": "^30.0.1",

@@ -7,7 +7,7 @@
  */
 
 import { readFile } from 'node:fs/promises'
-import { basename, dirname, resolve as resolvePath } from 'node:path'
+import { basename, dirname, relative, resolve as resolvePath } from 'node:path'
 import type { UserConfig } from 'tsdown'
 import { transform } from 'lightningcss'
 
@@ -28,6 +28,15 @@ const CSS_VIRTUAL_SUFFIX = '.mjs'
 /** 解析虚拟 CSS id 对应的物理文件。 */
 function sourceAssetPath(source: string, importer: string | undefined): string {
   return resolvePath(dirname(importer ?? ''), source)
+}
+
+/** Keep generated CSS module names and source maps independent of the checkout path. */
+function stableAssetId(filePath: string): string {
+  const stable = relative(process.cwd(), filePath).replaceAll('\\', '/')
+  if (stable === '..' || stable.startsWith('../')) {
+    throw new Error(`CSS asset is outside the project: ${filePath}`)
+  }
+  return stable
 }
 
 /** 宿主 half：ESM 库构建（纯浏览器插件，宿主侧为空操作）。 */
@@ -70,13 +79,14 @@ const clientConfig: UserConfig = {
     resolveId(source: string, importer: string | undefined) {
       if (!source.endsWith('.module.css')) return null
       const abs = importer !== undefined ? sourceAssetPath(source, importer) : source
-      return CSS_VIRTUAL_PREFIX + abs + CSS_VIRTUAL_SUFFIX
+      return CSS_VIRTUAL_PREFIX + stableAssetId(abs) + CSS_VIRTUAL_SUFFIX
     },
     async load(virtualId: string) {
       if (!virtualId.startsWith(CSS_VIRTUAL_PREFIX)) return null
       const fileId = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
-      this.addWatchFile(fileId)
-      const source = await readFile(fileId)
+      const filePath = resolvePath(fileId)
+      this.addWatchFile(filePath)
+      const source = await readFile(filePath)
       const { code, exports: cssExports } = transform({
         filename: fileId,
         code: source,
@@ -91,7 +101,7 @@ const clientConfig: UserConfig = {
       }
       const cssBody = [
         'const css = ' + JSON.stringify(code.toString()) + ';',
-        'const tagId = ' + JSON.stringify(ID + '/' + basename(fileId)) + ';',
+        'const tagId = ' + JSON.stringify(ID + '/' + basename(filePath)) + ';',
         "if (typeof document !== 'undefined' && document.querySelector('style[data-plugin-css=' + JSON.stringify(tagId) + ']') === null) {",
         "  const tag = document.createElement('style');",
         '  tag.dataset.plugin = ' + JSON.stringify(ID) + ';',
