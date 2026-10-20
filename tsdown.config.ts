@@ -1,5 +1,5 @@
 /**
- * dsh-effort-slider 构建配置：宿主 half（ESM lib/index.js，空操作）+
+ * dsh-effort-slider 构建配置：宿主 half（ESM lib/index.js，通用档位供给）+
  * 浏览器 half（CJS lib/client.js）。
  * 浏览器 half 复用官方外部插件约定：经典脚本 + window.__ModuleLoader__.load 工厂；
  * 平台模块（react / react-dom / react-jsx-runtime）走 externals；
@@ -30,7 +30,7 @@ function sourceAssetPath(source: string, importer: string | undefined): string {
   return resolvePath(dirname(importer ?? ''), source)
 }
 
-/** 宿主 half：ESM 库构建（纯浏览器插件，宿主侧为空操作）。 */
+/** 宿主 half：ESM 库构建（pi-ai 通用档位供给）。 */
 const libConfig: UserConfig = {
   name: ID,
   entry: { index: 'src/index.ts' },

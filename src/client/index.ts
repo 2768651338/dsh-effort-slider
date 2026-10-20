@@ -135,7 +135,9 @@ function paintTriggerEffort(): void {
     // 只有显示档位的触发器才带「推理等级 / reasoning effort」的可访问标签。
     if (!matchesEffortTriggerAria(aria)) continue
     effortUiDetected = true
-    const spans = Array.from(trigger.querySelectorAll('span'))
+    // 0.2.1 的模型名 slot 会再嵌套 span；只数按钮的直接子节点，避免把模型名
+    // 当成档位着色，或给第三方模型名装饰组件染色。
+    const spans = Array.from(trigger.children).filter((child): child is HTMLSpanElement => child.tagName === 'SPAN')
     const value = spans[1]
     if (value === undefined) continue
     const valueText = (value.textContent ?? '').trim()
@@ -195,13 +197,16 @@ export function apply(ctx: ClientContext): void {
   let root: Root | null = null
   // 当前面板的锚点行（跟随定位与「再次点击收起」的判定用）。
   let anchorRef: HTMLElement | null = null
+  let panelSession: string | null = null
+  let disposed = false
 
   const hidePanel = (): void => {
     anchorRef = null
+    panelSession = null
     root?.unmount()
     root = null
     // 面板关闭后补涂一次：操作期间官方可能已重渲染菜单行。
-    schedulePaintAll()
+    if (!disposed) schedulePaintAll()
   }
 
   /** 按锚点矩形把面板摆进视口（下方不够时弹到锚点上方）。 */
@@ -235,16 +240,25 @@ export function apply(ctx: ClientContext): void {
     placePanelAt(rect)
   }
 
-  const showPanel = (sessionId: string, anchor: HTMLElement): void => {
+  const showPanel = (sessionId: string, anchor: HTMLElement): boolean => {
+    let directory
+    try {
+      directory = directories.directoryFor(sessionId)
+    } catch (error) {
+      console.warn('[effort-slider] model directory unavailable:', error)
+      return false
+    }
     anchorRef = anchor
+    panelSession = sessionId
     placePanelAt(anchor.getBoundingClientRect())
     if (root === null) root = createRoot(host)
     root.render(createElement(EffortPanel, {
       sessionId,
-      directory: directories.directoryFor(sessionId),
+      directory,
       onClose: hidePanel,
       onEffortChange,
     }))
+    return true
   }
 
   /** 面板档位变化：记住当前档位，并给仍开着的菜单行即时涂色。 */
@@ -258,7 +272,10 @@ export function apply(ctx: ClientContext): void {
   // 任何 DOM 变化都触发一次节流全量扫描，不依赖 mutation 的具体粒度。
   const paintObserver = typeof MutationObserver === 'undefined'
     ? null
-    : new MutationObserver(() => schedulePaintAll())
+    : new MutationObserver(() => {
+        if (anchorRef !== null && !anchorRef.isConnected) hidePanel()
+        schedulePaintAll()
+      })
   if (paintObserver !== null) {
     paintObserver.observe(document.body, { childList: true, subtree: true, characterData: true })
   }
@@ -272,17 +289,24 @@ export function apply(ctx: ClientContext): void {
       const text = (row.textContent ?? '').trim()
       // 官方 root 菜单的第二行：label「推理等级」/「Effort」。
       if (matchesEffortRowText(text)) {
-        event.preventDefault()
-        event.stopPropagation()
+        if (row.matches(':disabled, [aria-disabled="true"]')) return
         // 面板开着时再点同一行 = 收起（toggle），而不是原地重渲染同位置。
         if (root !== null && anchorRef === row) {
+          event.preventDefault()
+          event.stopPropagation()
           hidePanel()
           return
         }
         paintAllEffortRows()
         const current = currentSessionId(sessions)
-        if (current !== undefined) showPanel(current, row)
-        else console.warn('[effort-slider] no session id')
+        if (current === undefined) {
+          console.warn('[effort-slider] no session id')
+          return
+        }
+        if (showPanel(current, row)) {
+          event.preventDefault()
+          event.stopPropagation()
+        }
         return
       }
       // 识别诊断：点的是菜单行，但此前任何一次扫描都没识别到 Effort 入口
@@ -298,6 +322,21 @@ export function apply(ctx: ClientContext): void {
   }
   document.addEventListener('click', onDocClick, true)
 
+  // 新版官方菜单在 document mousedown / React onBlur 时关闭。插件浮层在
+  // body 下，需把移入浮层的交互视为菜单内部操作，保留原生 range 的焦点/拖动。
+  const onPanelMouseDown = (event: MouseEvent): void => event.stopPropagation()
+  host.addEventListener('mousedown', onPanelMouseDown)
+  const onFocusOut = (event: FocusEvent): void => {
+    const fromPanel = event.target instanceof window.Node && host.contains(event.target)
+    if (root !== null && !fromPanel && event.relatedTarget instanceof window.Node && host.contains(event.relatedTarget)) {
+      event.stopPropagation()
+    }
+  }
+  document.addEventListener('focusout', onFocusOut, true)
+  const stopSessionWatch = sessions.list.subscribe?.(() => {
+    if (panelSession !== null && currentSessionId(sessions) !== panelSession) hidePanel()
+  })
+
   // Esc 关闭面板（不阻断传播：官方菜单的 Esc 关闭行为照常）。
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape' && root !== null) hidePanel()
@@ -309,11 +348,15 @@ export function apply(ctx: ClientContext): void {
 
   ctx.effect(
     () => () => {
+      disposed = true
       document.removeEventListener('click', onDocClick, true)
+      document.removeEventListener('focusout', onFocusOut, true)
+      host.removeEventListener('mousedown', onPanelMouseDown)
       document.removeEventListener('keydown', onKeyDown, true)
       window.removeEventListener('scroll', repositionPanel, true)
       window.removeEventListener('resize', repositionPanel)
       paintObserver?.disconnect()
+      stopSessionWatch?.()
       uiState.lastEffortId = null
       hidePanel()
       host.remove()

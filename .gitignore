@@ -6,3 +6,5 @@ node_modules/
 INSTALL.md
 /.mimosa/
 /docs/lang/.mimosa/
+/output/
+/.playwright-cli/

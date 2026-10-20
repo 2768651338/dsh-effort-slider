@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.5.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.1-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -36,6 +36,8 @@ Clique na linha **Effort** (segunda linha do menu de modelos oficial) em vez da 
 
 ---
 
+> 🔧 **v0.5.1** — Compatibilidade com DSH **0.2.1-rc.2**: configurações volatile em tempo real, gravações com revisão, falhas `RemoteResult`, nomes aninhados e foco do menu. Verificado com pacotes oficiais e fixtures isolados.
+>
 > 🆕 **v0.5.0** — Lote de correções da avaliação. Confiabilidade: o painel separa carregando / falha de carregamento / não suportado em três estados com botão de repetição; gravações falhas do slider exibem um estado vermelho transitório em vez de falhar em silêncio; edições concorrentes do usuário são detectadas (a entrada é relida antes de `mutate`, rodadas em conflito cedem a vez); todos os caminhos de falha do provisionamento do host agora registram um aviso, e uma linha Effort nunca reconhecida gera um diagnóstico único. UX do painel: reancora em scroll/resize, fecha com Esc / clique fora / desmontagem da âncora, e clicar novamente na linha Effort a alterna; pontos e rótulos da escala ficam alinhados aos pontos reais de encaixe; o slider carrega `aria-label` / `aria-valuetext`; os textos da UI são bilíngues (zh/en, seguindo `<html lang>`). Nova opção `debugReport`: detalhamento de provisionamento por rota/modelo mais um rastreador opcional de somente leitura `llm/stream` que registra rota/modelo/effort por requisição; uma dica `?` no cabeçalho do painel aponta para `enabled` / dialeto / `debugReport`. Além disso: CI com GitHub Actions (typecheck + testes + build + gate de frescor de artefatos), o fogo WebGL não queima mais a 60 fps quando invisível, e o pacote npm passa a se chamar `@txc2768651338/dsh-effort-slider` (o antigo nome sem escopo `dsh-effort-slider` é aposentado).
 >
 > 🆕 **v0.4.0** — Portado para o DSH **0.2.0**: o DSH substituiu seu serviço de settings por `SettingsForms` (as configurações agora são configs de profile entry; `installSection` / `settings.get` / `settings/updated` desapareceram). A metade host agora localiza a profile entry do pi-ai (`llm-pi-ai`), lê via `settings.describe()`, grava via `settings.mutate()` e escuta `settings/document-updated`. A metade cliente deriva a sessão atual de `retainedBy.mainView` (`SessionListState.current` foi removido). As opções do plugin (`enabled` / `defaultDialect` / `routes`) vivem na configuração da entry do plugin, editáveis na página de configurações do DSH. DSH ≤ 0.1.5 não é mais suportado (use lá a v0.3.0).
@@ -100,7 +102,7 @@ pi-ai, então o dialeto não tem efeito no protocolo ali:
 
 | Item | Valor |
 | --- | --- |
-| Versão do DSH | **0.2.0-rc.2** (a dist-tag `latest` do npm; a versão contra a qual este build foi verificado), perfil web no Windows |
+| Versão do DSH | **0.2.1-rc.2** (a dist-tag `latest` do npm; a versão contra a qual este build foi verificado), perfil web no Windows |
 | Não funciona em | DSH ≤ 0.1.5 — a v0.4.0 mira o serviço de settings `SettingsForms` introduzido no 0.2.0 (use a v0.3.0 para o DSH 0.1.5; a v0.2.5 e anteriores também importam `@deepseek-ai/dsh-client-runtime`, removido após 0.1.1-rc.2) |
 | Mecanismo de instalação | `dsh plugin --profile web add` (patch de bundle + dupla metade) |
 | Depende de | `ctx.sessions` (`@deepseek-ai/dsh-api-session-controller`) e `ctx.modelDirectories` (`@deepseek-ai/dsh-client-ui-model-selection`); host: `ctx.llm`, `ctx.settings` (`SettingsForms`) |
@@ -143,7 +145,7 @@ Uma linha `[effort-slider] intercept row: ...` no Console do DevTools significa 
 
 | Item | Detalhes |
 | --- | --- |
-| Opções do plugin | a configuração de profile entry do plugin (`enabled` / `defaultDialect` / `routes` / `debugReport`), editável na página de configurações do DSH (formulário gerado automaticamente), aplicada ao remontar o plugin |
+| Opções do plugin | `enabled` / `defaultDialect` / `routes` / `debugReport` no profile entry; campos volatile de SettingsForms no DSH 0.2.1, aplicados sem remontar. Sem formulário, edite o profile patch |
 | Padrões | `enabled: true`, `defaultDialect: effort`, `debugReport: false` |
 | Variáveis de ambiente | nenhuma própria; segue a resolução de `DSH_HOME` do DSH |
 | Itens sensíveis | nenhum — nenhuma chave, token ou credencial é lida ou armazenada |
@@ -213,7 +215,7 @@ test/                      testes unitários host.spec.mjs + host-apply.spec.mjs
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js (metade host) + lib/client.js (metade navegador)
-pnpm typecheck   # tsc --noEmit (verde contra @deepseek-ai/* 0.2.0-rc.2)
+pnpm typecheck   # tsc --noEmit (verde contra @deepseek-ai/* 0.2.1-rc.2)
 pnpm test        # unitários do host + integração apply + integração de costura real + smoke jsdom
 ```
 

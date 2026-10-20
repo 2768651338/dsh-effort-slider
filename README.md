@@ -7,7 +7,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.5.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.1-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -30,6 +30,8 @@ Click the **Effort** row (second row of the official model menu) instead of the 
 
 ---
 
+> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** compatibility: volatile settings with live updates, revision-checked provisioning, resolved `RemoteResult` failures, nested model-label slots, menu focus/blur integration, and safe handling of unavailable models and Session changes. Includes tests using the official SettingsForms, ModelSelect and ModelDirectory packages with isolated fixtures.
+>
 > 🆕 **v0.5.0** — Evaluation-fix batch. Reliability: the panel splits loading / load-failed / unsupported into three states with a retry button; failed slider writes surface a transient red status instead of failing silently; user config edits made mid-provision are detected (the entry is re-read before `mutate`, conflicting rounds defer); every host provisioning failure path now logs a warning, and an unrecognized Effort row produces a one-time diagnostic. Panel UX: re-anchors on scroll/resize, closes on Esc / outside click / anchor unmount, and clicking the Effort row toggles it; tick dots and labels align with the real snap points; the slider carries `aria-label` / `aria-valuetext`; UI text is bilingual (zh/en, follows `<html lang>`). New `debugReport` option: per-route/per-model provisioning detail plus an optional read-only `llm/stream` tracer logging route/model/effort per request; a `?` help hint in the panel header points at `enabled` / dialect / `debugReport`. Also: GitHub Actions CI (typecheck + tests + build + stale-artifact gate), the WebGL fire no longer burns at 60 fps while invisible, and the npm package is renamed to `@txc2768651338/dsh-effort-slider` (the old unscoped `dsh-effort-slider` name is retired).
 >
 > 🆕 **v0.4.0** — Ported to DSH **0.2.0**: DSH replaced its settings service with `SettingsForms` (settings are now profile entry configs; `installSection` / `settings.get` / `settings/updated` are gone). The host half now locates the pi-ai profile entry (`llm-pi-ai`), reads it via `settings.describe()`, writes via `settings.mutate()`, and listens to `settings/document-updated`. The client half derives the current session from `retainedBy.mainView` (`SessionListState.current` was removed). Plugin options (`enabled` / `defaultDialect` / `routes`) live in the plugin's entry config, editable in the DSH settings page. DSH ≤ 0.1.5 is no longer supported (use v0.3.0 there).
@@ -101,7 +103,7 @@ has no wire effect there:
 
 | Item | Value |
 | --- | --- |
-| DSH version | **0.2.0-rc.2** (the npm `latest` dist-tag; the version this build is verified against), web profile on Windows |
+| DSH version | **0.2.1-rc.2** (the npm `latest` dist-tag; the version this build is verified against), web profile on Windows |
 | Broken on | DSH ≤ 0.1.5 — v0.4.0 targets the `SettingsForms` settings service introduced in 0.2.0 (use v0.3.0 for DSH 0.1.5; v0.2.5 and earlier also import `@deepseek-ai/dsh-client-runtime`, which was removed after 0.1.1-rc.2) |
 | Install mechanism | `dsh plugin --profile web add` (bundle patch + dual half) |
 | Depends on | `ctx.sessions` (`@deepseek-ai/dsh-api-session-controller`) and `ctx.modelDirectories` (`@deepseek-ai/dsh-client-ui-model-selection`); host: `ctx.llm`, `ctx.settings` (`SettingsForms`) |
@@ -145,7 +147,7 @@ A `[effort-slider] intercept row: ...` line in DevTools Console means intercepti
 
 | Item | Details |
 | --- | --- |
-| Plugin options | The plugin's profile entry config (`enabled` / `defaultDialect` / `routes` / `debugReport`), editable in the DSH settings page (auto-generated form), applied on plugin remount |
+| Plugin options | The plugin's profile entry config (`enabled` / `defaultDialect` / `routes` / `debugReport`); DSH 0.2.1 exposes these as volatile fields through SettingsForms. Changes take effect without a plugin remount. Edit the profile patch if your DSH UI has no generated plugin form |
 | Defaults | `enabled: true`, `defaultDialect: effort`, `debugReport: false` |
 | Environment variables | None of its own; follows DSH's `DSH_HOME` resolution |
 | Sensitive items | None — no keys, tokens, or credentials are read or stored |
@@ -217,8 +219,8 @@ test/                      host.spec.mjs unit tests + host-apply.spec.mjs + clie
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js (host half) + lib/client.js (browser half)
-pnpm typecheck   # tsc --noEmit (green against @deepseek-ai/* 0.2.0-rc.2)
-pnpm test        # host unit tests + apply integration test + real-seam integration test + jsdom smoke
+pnpm typecheck   # tsc --noEmit (green against @deepseek-ai/* 0.2.1-rc.2)
+pnpm test        # six suites, including the official DSH settings/model UI compatibility checks
 ```
 
 `test/` layers, cheapest first:
@@ -229,6 +231,10 @@ pnpm test        # host unit tests + apply integration test + real-seam integrat
 | `host-apply.spec.mjs` | `apply()` against a mocked cordis context: late pi-ai entry retry, `compat` gating on the declared protocol, `settings/document-updated` idempotency |
 | `host-integration.spec.mjs` | **Real seam**: real `@deepseek-ai/cordis` + a faithful `SettingsForms` seam double (0.2.0's npm packages have no standalone provider) — entry discovery, real path-op writes landing in the profile entry config, and the written `reasoningEfforts`/`compat` passing pi-ai's validation rules |
 | `client.smoke.mjs` | jsdom: bundle factory materialization, Effort-row interception, panel render, drag/snap writes through `directory.select`, coloring, teardown |
+| `settings-compat.spec.mjs` | Published 0.2.1-rc.2 `SettingsForms` with in-memory Loader/editor fixtures: volatile fields, revision conflicts, live disable and dialect changes |
+| `dsh-compat.spec.mjs` | Published 0.2.1-rc.2 `ModelSelect`, `ModelDirectory` and snapshot store in jsdom; fixture transport/primitives: native focus/blur, RemoteResult refusals, nested labels, unavailable models, Session changes and teardown |
+
+These checks use isolated fixtures. They do not replace installing the plugin into a running DSH Desktop or sending a real provider request.
 
 **Contributing.** Fork → change → `pnpm build` → run `pnpm test` → open a PR against `main`. Small fixes (docs, tests) are welcome without prior discussion; report issues with the DSH version and the exact error.
 

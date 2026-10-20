@@ -9,7 +9,7 @@
  *    行会随之出现；
  * 2. 纯目录路由：为缺少原生 reasoning 的目录模型写 modelOverrides；
  * 3. 本插件配置（enabled / defaultDialect / routes / debugReport）由 profile
- *    条目配置承载，DSH 设置页可改，变更后插件按 cordis 语义重启重挂载。
+ *    条目配置承载；0.2.1 使用 volatile 字段，配置变更无需插件重挂载。
  *
  * 与 0.1.x 的差异：DSH 0.2.0 移除了独立 settings 文档与命名空间注册
  * （installSection / settings.get / settings/updated 全部消失），设置即
@@ -28,6 +28,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { SettingsForms } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/cordis-plugin-loader'
 import z from '@deepseek-ai/schemastery'
 import {
   DIALECT_KEYS,
@@ -48,16 +49,20 @@ export const name = 'ui-effort-slider'
 export const inject = ['llm', 'settings']
 
 /**
- * 本插件条目配置（DSH 0.2.0 设置页由插件导出的 Config 自动生成；
- * 变更按 cordis 语义重启本插件，供给幂等因此无需热更新钩子）。
+ * SettingsForms 只展示 volatile 字段；兼容未提供该方法的旧版 Schemastery，
+ * 此时保留普通字段并跟随插件重挂载语义。
  */
+function liveField<T extends { volatile?: () => unknown }>(schema: T): T {
+  return typeof schema.volatile === 'function' ? schema.volatile() as T : schema
+}
+
 export const Config = z.object({
-  enabled: z.boolean().default(true),
-  defaultDialect: z.union(DIALECT_KEYS).default('effort'),
-  routes: z.dict(z.union(DIALECT_KEYS)).default({}),
+  enabled: liveField(z.boolean().default(true)),
+  defaultDialect: liveField(z.union(DIALECT_KEYS).default('effort')),
+  routes: liveField(z.dict(z.union(DIALECT_KEYS)).default({})),
   // 供给诊断报告（P3-1）：开启后每轮供给输出逐路由逐模型明细（写入了什么/
   // 为何跳过），替代单行计数。明细行数与模型数成正比，默认关闭平衡日志噪音。
-  debugReport: z.boolean().default(false),
+  debugReport: liveField(z.boolean().default(false)),
 })
 
 /** pi-ai 条目 id 的默认值（pi-ai 0.2.0 的 NS 常量；仅当条目被改名时失配）。 */
@@ -68,6 +73,16 @@ interface EffortSliderConfig {
   defaultDialect: WireDialect
   routes: Record<string, WireDialect>
   debugReport: boolean
+}
+
+type LiveValue<T> = T | { get(): T }
+type ConfigInput = { [K in keyof EffortSliderConfig]?: LiveValue<EffortSliderConfig[K]> }
+
+function readValue<T>(value: LiveValue<T> | undefined, fallback: T): T {
+  if (typeof value === 'object' && value !== null && 'get' in value && typeof value.get === 'function') {
+    return value.get() as T
+  }
+  return (value ?? fallback) as T
 }
 
 /** pi-ai 条目配置的形态（仅本插件用到的成员）。 */
@@ -95,14 +110,14 @@ function isPiAiValue(value: unknown): boolean {
  * @param ctx - cordis 宿主上下文。
  * @param config - 本插件条目配置（patch base / 设置页补丁解析后的值）。
  */
-export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void {
-  const cfg: EffortSliderConfig = {
-    enabled: true,
-    defaultDialect: 'effort',
-    routes: {},
-    debugReport: false,
-    ...config,
-  }
+export function apply(ctx: Context, config?: ConfigInput): void {
+  const readConfig = (): EffortSliderConfig => ({
+    enabled: readValue(config?.enabled, true),
+    defaultDialect: readValue(config?.defaultDialect, 'effort'),
+    routes: { ...readValue(config?.routes, {}) },
+    debugReport: readValue(config?.debugReport, false),
+  })
+  let disposed = false
 
   const llm: LlmRuntime | undefined = ctx.get('llm')
   const settings: SettingsForms | undefined = ctx.get('settings')
@@ -148,6 +163,7 @@ export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void 
   const RETRY_MAX = 60 // 500ms × 60 = 30s 上限
 
   const scheduleRetry = (): void => {
+    if (disposed || !readConfig().enabled) return
     if (retryTimer !== null) return
     if (retryCount >= RETRY_MAX) {
       // 重试耗尽必须留下线索：慢机器冷启动时 pi-ai 条目 30s 后才挂载，
@@ -221,7 +237,8 @@ export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void 
   }
 
   const runProvision = async (): Promise<boolean> => {
-    if (!cfg.enabled) return true
+    const cfg = readConfig()
+    if (disposed || !cfg.enabled) return true
     const targetNs = findPiAiNs()
     if (targetNs === undefined) {
       // pi-ai 条目尚未挂载：延迟重试，直到条目就绪。
@@ -273,6 +290,9 @@ export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void 
         // debugReport 才能把「原生 reasoning 已声明」如实报出来。
         const nativeIds = new Set<string>()
         for (const id of catalogIds) {
+          // 已有 modelOverrides 时，目录中的 reasoning 可能正是我们上轮供给的
+          // 结果。按原生能力跳过会让后续方言更新失效，交给纯逻辑识别声明归属。
+          if (profile.modelOverrides?.[id]?.reasoningEfforts !== undefined) continue
           if (await hasNativeReasoning(route, id)) nativeIds.add(id)
         }
         newOps = await buildProvisionOps(route, profile, dialect, apiOf, catalogIds, (id) => nativeIds.has(id), onDecision)
@@ -307,6 +327,8 @@ export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void 
       ctx.logger.info('effort-slider: pi-ai entry changed during provisioning — deferring to the newer edit')
       return true
     }
+    // volatile 配置可在等待模型目录期间原地更新；停用/切换方言后不提交旧轮次。
+    if (disposed || !deepEqualJson(cfg, readConfig())) return true
     if (cfg.debugReport) {
       // 明细替代单行计数（P3-1）：逐路由逐模型报告写入了什么、为何跳过。
       emitDebugReport(report, ops.length)
@@ -314,7 +336,7 @@ export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void 
       ctx.logger.info(`effort-slider: provisioning ${ops.length} field(s) across pi-ai models`)
     }
     try {
-      await settings.mutate(targetNs, ops)
+      await settings.mutate(targetNs, ops, typeof entry.revision === 'number' ? entry.revision : undefined)
       // 目录模型的原生 reasoning 判定可能因刚写入的声明而过期，下次重新解析。
       nativeReasoning.clear()
     } catch (error) {
@@ -327,9 +349,10 @@ export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void 
   let provisionTail: Promise<void> = Promise.resolve()
   let queued = false
   const provision = (): Promise<void> => {
+    if (disposed) return Promise.resolve()
     queued = true
     provisionTail = provisionTail.then(async () => {
-      if (!queued) return
+      if (disposed || !queued) return
       queued = false
       await runProvision()
     }).catch((error) => {
@@ -353,18 +376,30 @@ export function apply(ctx: Context, config?: Partial<EffortSliderConfig>): void 
   // ——档位是否随请求下发（llm/stream 瀑布，只读透传）。线上翻译发生在
   // pi-ai 适配器内部、请求体不可见，因此只记录事实、不推断方言对错：
   // 追踪能证明「档位已下发」，剩下的嫌疑才收敛到线上翻译层。
-  if (cfg.debugReport) {
+  let traceInstalled = false
+  const installRequestTrace = (): void => {
+    if (!readConfig().debugReport || traceInstalled) return
+    traceInstalled = true
     ctx.on('llm/stream', (options, next) => {
-      const purpose = options.purpose === undefined ? '' : ` purpose=${options.purpose}`
-      ctx.logger.info(`effort-slider: [debug] request route=${options.provider} model=${options.model} effort=${options.reasoningEffort ?? '(none)'}${purpose}`)
+      if (readConfig().debugReport) {
+        const purpose = options.purpose === undefined ? '' : ` purpose=${options.purpose}`
+        ctx.logger.info(`effort-slider: [debug] request route=${options.provider} model=${options.model} effort=${options.reasoningEffort ?? '(none)'}${purpose}`)
+      }
       return next()
     })
   }
+  installRequestTrace()
+  ctx.on('loader/volatile-update', () => {
+    installRequestTrace()
+    nativeReasoning.clear()
+    void provision()
+  })
 
   void provision()
 
   ctx.effect(
     () => () => {
+      disposed = true
       if (retryTimer !== null) clearTimeout(retryTimer)
       retryTimer = null
     },

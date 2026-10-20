@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.5.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.1-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -36,6 +36,8 @@
 
 ---
 
+> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** に対応。volatile 設定の即時反映、リビジョン付き書き込み、`RemoteResult` の失敗処理、入れ子のモデル名の着色、メニューのフォーカスを修正。公式パッケージと隔離フィクスチャで検証。
+>
 > 🆕 **v0.5.0** — 評価修正バッチ。信頼性：パネルは「読み込み中 / 読み込み失敗 / 非対応」を 3 状態に分けて再試行ボタンを付属；スライダーの書き込み失敗時はヘッダー状態が一瞬赤くなり、サイレント失敗しない；供給中のユーザー設定同時編集を検出（`mutate` 前にエントリを再読み込み、競合ラウンドは譲る）；ホスト供給の全失敗パスが警告を記録し、認識できなかった Effort 行は 1 回だけ診断を出力。パネル操作：スクロール/リサイズに追従して再配置、Esc / 外側クリック / アンカーのアンマウントで閉じ、Effort 行の再クリックでトグル；目盛り点とラベルは実際のスナップ位置に整合；スライダーは `aria-label` / `aria-valuetext` を持ち、UI 文言は二言語（zh/en、`<html lang>` に追従）。新オプション `debugReport`：ルート/モデル別の供給詳細に加え、任意の読み取り専用 `llm/stream` トレーサーがリクエストごとに route/model/effort を記録；パネルヘッダーの「?」ヒントは `enabled` / ダイアレクト / `debugReport` の調査手順を指す。その他：GitHub Actions CI（typecheck + テスト + ビルド + 成果物新鮮度ゲート）を追加；パネル表示中でも不可視の WebGL 炎は 60fps で空焼きしない；npm パッケージは `@txc2768651338/dsh-effort-slider` に改名（旧スコープなし名 `dsh-effort-slider` は廃止）。
 >
 > 🆕 **v0.4.0** — DSH **0.2.0** へ移植：DSH は settings サービスを `SettingsForms` に置き換えました（設定は profile entry 設定になり、`installSection` / `settings.get` / `settings/updated` は廃止）。ホスト側は pi-ai の profile entry（`llm-pi-ai`）を特定し、`settings.describe()` で読み取り、`settings.mutate()` で書き込み、`settings/document-updated` を監視します。クライアント側は `retainedBy.mainView` から現在のセッションを導出します（`SessionListState.current` は削除済み）。プラグインオプション（`enabled` / `defaultDialect` / `routes`）はプラグインの entry 設定に置かれ、DSH の設定ページで編集できます。DSH ≤ 0.1.5 はサポート外（そちらでは v0.3.0 を使用）。
@@ -99,7 +101,7 @@
 
 | 項目 | 値 |
 | --- | --- |
-| DSH バージョン | **0.2.0-rc.2**（npm `latest` dist-tag。このビルドが検証対象としたバージョン）、Windows の web プロファイル |
+| DSH バージョン | **0.2.1-rc.2**（npm `latest` dist-tag。このビルドが検証対象としたバージョン）、Windows の web プロファイル |
 | 動作しない | DSH ≤ 0.1.5 — v0.4.0 は 0.2.0 で導入された `SettingsForms` settings サービスを対象とします（DSH 0.1.5 には v0.3.0 を使用。v0.2.5 以前はさらに `@deepseek-ai/dsh-client-runtime` を import しますが、このパッケージは 0.1.1-rc.2 以降に削除されました） |
 | インストール機構 | `dsh plugin --profile web add`（バンドルパッチ + ホスト/ブラウザの 2 半区） |
 | 依存 | `ctx.sessions`（`@deepseek-ai/dsh-api-session-controller`）と `ctx.modelDirectories`（`@deepseek-ai/dsh-client-ui-model-selection`）。ホスト側：`ctx.llm`、`ctx.settings`（`SettingsForms`） |
@@ -142,7 +144,7 @@ DevTools Console に `[effort-slider] intercept row: ...` と出ればインタ�
 
 | 項目 | 詳細 |
 | --- | --- |
-| プラグインオプション | プラグインの profile entry 設定（`enabled` / `defaultDialect` / `routes` / `debugReport`）。DSH の設定ページ（自動生成フォーム）で編集でき、プラグインの再マウント時に適用 |
+| プラグインオプション | profile entry の `enabled` / `defaultDialect` / `routes` / `debugReport`。DSH 0.2.1 では volatile フィールドとして SettingsForms に公開され、再マウントなしで反映。フォームがない場合は profile patch を編集 |
 | 既定値 | `enabled: true`、`defaultDialect: effort`、`debugReport: false` |
 | 環境変数 | 自前のものなし。DSH の `DSH_HOME` 解決に従う |
 | 機密項目 | なし — キー/トークン/資格情報は読み取りも保存もしません |
@@ -212,7 +214,7 @@ test/                      host.spec.mjs ホスト単体 + host-apply.spec.mjs +
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js（ホスト半区）+ lib/client.js（ブラウザ半区）
-pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.2.0-rc.2 に対してグリーン）
+pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.2.1-rc.2 に対してグリーン）
 pnpm test        # ホスト単体 + apply 結合 + リアムシーム結合 + jsdom スモーク
 ```
 

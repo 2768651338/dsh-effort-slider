@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.5.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.1-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -36,6 +36,8 @@
 
 ---
 
+> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** 호환: volatile 설정 즉시 반영, 리비전 검사 쓰기, `RemoteResult` 오류 처리, 중첩 모델 이름 및 메뉴 포커스 수정. 공식 패키지와 격리된 픽스처로 검증.
+>
 > 🆕 **v0.5.0** — 평가 수정 배치. 신뢰성: 패널이 로드 중 / 로드 실패 / 미지원을 세 상태로 분리하고 재시도 버튼을 제공; 슬라이더 쓰기 실패 시 헤더 상태가 잠시 빨갛게 표시되어 조용히 실패하지 않음; 공급 중 사용자 설정 동시 편집을 감지(`mutate` 전에 항목을 재판독, 충돌 라운드는 양보); 호스트 공급의 모든 실패 경로가 경고를 기록하고, 인식되지 않은 Effort 행은 1회성 진단을 출력. 패널 UX: 스크롤/리사이즈에 따라 재배치되고, Esc / 외부 클릭 / 앵커 언마운트 시 닫히며, Effort 행을 다시 누르면 토글; 눈금 점과 레이블이 실제 스냅 위치에 정렬; 슬라이더에 `aria-label` / `aria-valuetext` 제공, UI 문구는 이중 언어(zh/en, `<html lang>` 따름). 새 옵션 `debugReport`: 라우트/모델별 공급 상세와 선택적 읽기 전용 `llm/stream` 트레이서가 요청별로 route/model/effort를 기록; 패널 헤더의 `?` 도움말은 `enabled` / 다이얼렉트 / `debugReport` 점검 절차를 안내. 그 외: GitHub Actions CI(typecheck + 테스트 + 빌드 + 산출물 신선도 게이트) 추가; 패널이 열려 있어도 보이지 않는 WebGL 불꽃은 60fps로 헛돌지 않음; npm 패키지명이 `@txc2768651338/dsh-effort-slider`로 변경(구 스코프 없는 이름 `dsh-effort-slider` 폐지).
 >
 > 🆕 **v0.4.0** — DSH **0.2.0** 대응: DSH가 settings 서비스를 `SettingsForms`로 대체했습니다（설정은 이제 profile entry 설정이며, `installSection` / `settings.get` / `settings/updated`는 삭제됨）. 호스트 측은 pi-ai의 profile entry（`llm-pi-ai`）를 찾아 `settings.describe()`로 읽고 `settings.mutate()`로 쓰며, `settings/document-updated`를 구독합니다. 클라이언트 측은 `retainedBy.mainView`에서 현재 세션을 도출합니다（`SessionListState.current`는 삭제됨）. 플러그인 옵션（`enabled` / `defaultDialect` / `routes`）는 플러그인의 entry 설정에 있으며 DSH 설정 페이지에서 편집할 수 있습니다. DSH ≤ 0.1.5는 미지원（해당 버전에서는 v0.3.0 사용）.
@@ -98,7 +100,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| DSH 버전 | **0.2.0-rc.2**（npm `latest` dist-tag, 이 빌드가 검증한 버전）, Windows의 web 프로필 |
+| DSH 버전 | **0.2.1-rc.2**（npm `latest` dist-tag, 이 빌드가 검증한 버전）, Windows의 web 프로필 |
 | 미지원 | DSH ≤ 0.1.5 — v0.4.0은 0.2.0에서 도입된 `SettingsForms` settings 서비스를 대상으로 함（DSH 0.1.5에는 v0.3.0 사용. v0.2.5 이하는 추가로 `@deepseek-ai/dsh-client-runtime`을 import하며 이 패키지는 0.1.1-rc.2 이후 제거됨） |
 | 설치 방식 | `dsh plugin --profile web add`（번들 패치 + 호스트/브라우저 더블 하프） |
 | 의존 | `ctx.sessions`（`@deepseek-ai/dsh-api-session-controller`）와 `ctx.modelDirectories`（`@deepseek-ai/dsh-client-ui-model-selection`）. 호스트: `ctx.llm`, `ctx.settings`（`SettingsForms`） |
@@ -141,7 +143,7 @@ DevTools Console에 `[effort-slider] intercept row: ...`가 보이면 인터셉�
 
 | 항목 | 내용 |
 | --- | --- |
-| 플러그인 옵션 | 플러그인의 profile entry 설정（`enabled` / `defaultDialect` / `routes` / `debugReport`）. DSH 설정 페이지（자동 생성 폼）에서 편집하며 플러그인 리마운트 시 적용 |
+| 플러그인 옵션 | profile entry의 `enabled` / `defaultDialect` / `routes` / `debugReport`. DSH 0.2.1에서는 SettingsForms의 volatile 필드로 노출되고 리마운트 없이 반영. 폼이 없으면 profile patch 편집 |
 | 기본값 | `enabled: true`, `defaultDialect: effort`, `debugReport: false` |
 | 환경 변수 | 자체 변수 없음 — DSH의 `DSH_HOME` 해석을 따름 |
 | 민감 항목 | 없음 — 키/토큰/자격 증명을 읽거나 저장하지 않음 |
@@ -211,7 +213,7 @@ test/                      host.spec.mjs 호스트 단위 + host-apply.spec.mjs 
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js（호스트 측） + lib/client.js（브라우저 측）
-pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.2.0-rc.2 기준 그린）
+pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.2.1-rc.2 기준 그린）
 pnpm test        # 호스트 단위 + apply 통합 + 실제 이음세 통합 + jsdom 스모크
 ```
 

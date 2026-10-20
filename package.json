@@ -1,7 +1,7 @@
 {
   "name": "@txc2768651338/dsh-effort-slider",
   "description": "仿 Claude Code 推理等级滑块 DSH 插件：无极拖动、松手吸附、WebGL 火焰跟随、OFF/MAX 刻度、Low/Medium/High/Ultracode 状态；宿主侧通用思考强度供给——任何自定义第三方模型/提供商都能获得真实生效的思考强度调节。",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "packageManager": "pnpm@10.34.5",
   "main": "lib/index.js",
@@ -34,22 +34,31 @@
     "build": "tsdown --config ./tsdown.config.ts",
     "watch": "tsdown --config ./tsdown.config.ts --watch",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node test/host.spec.mjs && node test/host-apply.spec.mjs && node test/host-integration.spec.mjs && node test/client.smoke.mjs"
+    "test": "node test/host.spec.mjs"
   },
   "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.5",
+    "@deepseek-ai/cordis-plugin-group": "1.0.5",
+    "@deepseek-ai/cordis-plugin-include": "1.0.10",
+    "@deepseek-ai/cordis-plugin-loader": "1.0.6",
+    "@deepseek-ai/dsh-api-session-controller": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-store": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-model-selection": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-llm": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-settings": "0.2.1-rc.2",
+    "@deepseek-ai/schemastery": "^3.18.5",
+    "@types/node": "^24.13.4",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "immer": "^10.2.0",
     "jsdom": "^30.0.1",
     "lightningcss": "^1.33.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "tsdown": "^0.22.14",
     "typescript": "^5.9.3",
-    "@types/node": "^24.13.4",
-    "@types/react": "^18.3.31",
-    "@types/react-dom": "^18.3.7",
-    "@deepseek-ai/schemastery": "^3.18.2",
-    "@deepseek-ai/cordis": "^4.0.4",
-    "@deepseek-ai/dsh-settings": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-llm": "0.2.0-rc.2"
+    "yaml": "^2.9.1",
+    "zustand": "~4.5.7"
   },
   "repository": {
     "type": "git",

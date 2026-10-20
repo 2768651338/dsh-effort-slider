@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.5.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.1-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -36,6 +36,8 @@
 
 ---
 
+> 🔧 **v0.5.1** — Поддержка DSH **0.2.1-rc.2**: volatile-настройки без перемонтирования, запись с проверкой ревизии, ошибки `RemoteResult`, вложенные имена моделей и фокус меню. Проверено на официальных пакетах с изолированными фикстурами.
+>
 > 🆕 **v0.5.0** — Пакет исправлений по итогам оценки. Надёжность: панель разделяет «загрузка / ошибка загрузки / не поддерживается» на три состояния с кнопкой повтора; неудачные записи слайдера кратко подсвечивают статус красным вместо тихого сбоя; одновременные правки конфигурации пользователем обнаруживаются (запись перечитывается перед `mutate`, конфликтующие раунды уступают); все пути сбоя провижининга на стороне хоста пишут предупреждение, а ни разу не опознанная строка Effort выдаёт одноразовую диагностику. UX панели: перепозиционируется при прокрутке/изменении окна, закрывается по Esc / клику вне / размонтированию якоря, повторный клик по строке Effort переключает её; точки и подписи шкалы выровнены по реальным точкам прилипания; слайдер несёт `aria-label` / `aria-valuetext`; тексты интерфейса двуязычны (zh/en, по `<html lang>`). Новая опция `debugReport`: детализация провижининга по маршрутам/моделям плюс необязательный read-only трассировщик `llm/stream`, пишущий route/model/effort на каждый запрос; подсказка `?` в шапке панели указывает на `enabled` / диалект / `debugReport`. Также: CI на GitHub Actions (typecheck + тесты + сборка + проверка свежести артефактов), WebGL-огонь больше не горит на 60 fps, когда невидим, а npm-пакет переименован в `@txc2768651338/dsh-effort-slider` (старое имя без scope `dsh-effort-slider` выведено из употребления).
 >
 > 🆕 **v0.4.0** — Портировано на DSH **0.2.0**: DSH заменил свой сервис settings на `SettingsForms` (настройки теперь — конфигурации profile entry; `installSection` / `settings.get` / `settings/updated` удалены). Хост-часть теперь находит profile entry pi-ai (`llm-pi-ai`), читает её через `settings.describe()`, пишет через `settings.mutate()` и слушает `settings/document-updated`. Клиентская часть выводит текущую сессию из `retainedBy.mainView` (`SessionListState.current` удалён). Опции плагина (`enabled` / `defaultDialect` / `routes`) живут в конфигурации entry плагина, редактируются на странице настроек DSH. DSH ≤ 0.1.5 больше не поддерживается (там используйте v0.3.0).
@@ -100,7 +102,7 @@
 
 | Пункт | Значение |
 | --- | --- |
-| Версия DSH | **0.2.0-rc.2** (dist-tag npm `latest`; версия, под которую проверена эта сборка), веб-профиль на Windows |
+| Версия DSH | **0.2.1-rc.2** (dist-tag npm `latest`; версия, под которую проверена эта сборка), веб-профиль на Windows |
 | Не работает на | DSH ≤ 0.1.5 — v0.4.0 нацелена на сервис settings `SettingsForms`, появившийся в 0.2.0 (для DSH 0.1.5 используйте v0.3.0; v0.2.5 и ранее также импортируют `@deepseek-ai/dsh-client-runtime`, удалённый после 0.1.1-rc.2) |
 | Механизм установки | `dsh plugin --profile web add` (патч бандла + две половины) |
 | Зависимости | `ctx.sessions` (`@deepseek-ai/dsh-api-session-controller`) и `ctx.modelDirectories` (`@deepseek-ai/dsh-client-ui-model-selection`); хост: `ctx.llm`, `ctx.settings` (`SettingsForms`) |
@@ -143,7 +145,7 @@ dsh plugin --profile web add file:./dsh-effort-slider
 
 | Пункт | Подробности |
 | --- | --- |
-| Опции плагина | конфигурация profile entry плагина (`enabled` / `defaultDialect` / `routes` / `debugReport`), редактируется на странице настроек DSH (автоматически сгенерированная форма), применяется при перемонтировании плагина |
+| Опции плагина | `enabled` / `defaultDialect` / `routes` / `debugReport` в profile entry; в DSH 0.2.1 это volatile-поля SettingsForms, изменения без перемонтирования. При отсутствии формы редактируйте profile patch |
 | Значения по умолчанию | `enabled: true`, `defaultDialect: effort`, `debugReport: false` |
 | Переменные окружения | своих нет; следует разрешению `DSH_HOME` в DSH |
 | Чувствительные данные | нет — ключи, токены и учётные данные не читаются и не сохраняются |
@@ -213,7 +215,7 @@ test/                      юнит-тесты host.spec.mjs + host-apply.spec.m
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js (хост-половина) + lib/client.js (браузерная половина)
-pnpm typecheck   # tsc --noEmit (зелёный против @deepseek-ai/* 0.2.0-rc.2)
+pnpm typecheck   # tsc --noEmit (зелёный против @deepseek-ai/* 0.2.1-rc.2)
 pnpm test        # юнит-тесты хоста + интеграция apply + интеграция реального шва + jsdom-дым
 ```
 

@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.5.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.1-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -40,6 +40,8 @@
 
 ---
 
+> 🔧 **v0.5.1** — 适配 DSH **0.2.1-rc.2**：配置改为 volatile 字段并即时生效；供给写入携带修订号；正确处理 `RemoteResult` 失败；修复嵌套模型名导致的档位着色偏移和菜单焦点/失焦问题；会话切换、模型失效时关闭或禁用旧面板。新增官方 SettingsForms、ModelSelect、ModelDirectory 的隔离夹具集成验证。
+>
 > 🆕 **v0.5.0** — 评估修复批次。可靠性：面板将「加载中 / 加载失败 / 不支持」拆分为三分支状态并附重试按钮；滑杆写入失败时 header 状态短暂变红而非静默；供给途中检测用户并发编辑（`mutate` 前重读条目，冲突轮让路）；宿主供给全部失败路径均落告警，Effort 行从未被识别时输出一次性诊断。面板交互：跟随滚动/窗口变化重新定位，Esc / 点击外部 / 锚点卸载时关闭，再次点击 Effort 行可收起；刻度点与标签对齐真实吸附位置；滑杆带 `aria-label` / `aria-valuetext`；UI 文案双语（zh/en，跟随 `<html lang>`）。新增 `debugReport` 选项：逐路由逐模型供给明细，并可选只读 `llm/stream` 追踪逐请求记录 route/model/effort；面板 header 的「?」提示指向 `enabled` / 方言 / `debugReport` 排查链路。另外：新增 GitHub Actions CI（typecheck + 测试 + 构建 + 产物新鲜度门禁）；面板开着但不可见时 WebGL 火焰不再 60fps 空烧；npm 包更名为 `@txc2768651338/dsh-effort-slider`（旧无 scope 名 `dsh-effort-slider` 弃用）。
 >
 > 🆕 **v0.4.0** — 适配 DSH **0.2.0**：DSH 用 `SettingsForms` 取代了原有 settings 服务（设置现以 profile entry 配置形式存在；`installSection` / `settings.get` / `settings/updated` 均已移除）。宿主半区现定位 pi-ai profile entry（`llm-pi-ai`），经 `settings.describe()` 读取、经 `settings.mutate()` 写入，并监听 `settings/document-updated`。客户端半区改由 `retainedBy.mainView` 推导当前会话（`SessionListState.current` 已移除）。插件选项（`enabled` / `defaultDialect` / `routes`）存于插件的 entry 配置，可在 DSH 设置页编辑。不再支持 DSH ≤ 0.1.5（该版本请使用 v0.3.0）。
@@ -111,7 +113,7 @@
 
 | 项目 | 值 |
 | --- | --- |
-| DSH 版本 | **0.2.0-rc.2**（npm `latest` dist-tag，本构建即针对该版本验证）；web profile，Windows |
+| DSH 版本 | **0.2.1-rc.2**（npm `latest` dist-tag，本构建即针对该版本验证）；web profile，Windows |
 | 不再支持 | DSH ≤ 0.1.5 —— v0.4.0 面向 0.2.0 引入的 `SettingsForms` settings 服务（DSH 0.1.5 请使用 v0.3.0；v0.2.5 及更早还导入了 `@deepseek-ai/dsh-client-runtime`，该包在 0.1.1-rc.2 之后已被移除） |
 | 安装机制 | `dsh plugin --profile web add`（bundle patch + 双半区） |
 | 依赖 | `ctx.sessions`（`@deepseek-ai/dsh-api-session-controller`）与 `ctx.modelDirectories`（`@deepseek-ai/dsh-client-ui-model-selection`）；宿主：`ctx.llm`、`ctx.settings`（`SettingsForms`） |
@@ -155,7 +157,7 @@ DevTools Console 出现 `[effort-slider] intercept row: ...` 表示拦截成功�
 
 | 项目 | 详情 |
 | --- | --- |
-| 插件级选项 | 插件的 profile entry 配置（`enabled` / `defaultDialect` / `routes` / `debugReport`），可在 DSH 设置页（自动生成的表单）编辑，插件重挂载时生效 |
+| 插件级选项 | 插件的 profile entry 配置（`enabled` / `defaultDialect` / `routes` / `debugReport`）；DSH 0.2.1 将其作为 volatile 字段经 SettingsForms 暴露，修改后无需重挂载即生效；当前 DSH 界面未提供插件表单时，直接编辑 profile patch |
 | 默认值 | `enabled: true`，`defaultDialect: effort`，`debugReport: false` |
 | 环境变量 | 无自有变量，遵循 DSH 的 `DSH_HOME` 解析 |
 | 敏感项 | 无 — 不读取、不存储任何密钥/令牌/凭据 |
@@ -227,11 +229,11 @@ test/                      host.spec.mjs 宿主单测 + host-apply.spec.mjs + cl
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js（宿主半区）+ lib/client.js（浏览器半区）
-pnpm typecheck   # tsc --noEmit（对 @deepseek-ai/* 0.2.0-rc.2 全绿）
-pnpm test        # 宿主单测 + apply 集成 + 真实接缝集成 + jsdom 冒烟
+pnpm typecheck   # tsc --noEmit（对 @deepseek-ai/* 0.2.1-rc.2 全绿）
+pnpm test        # 六组验证，包含官方 DSH 设置服务与模型界面的兼容性集成检查
 ```
 
-`test/` 四层，由浅入深：
+`test/` 验证层次：
 
 | 文件 | 覆盖范围 |
 | --- | --- |
@@ -239,6 +241,10 @@ pnpm test        # 宿主单测 + apply 集成 + 真实接缝集成 + jsdom 冒�
 | `host-apply.spec.mjs` | mock cordis 上下文下的 `apply()`：pi-ai entry 晚注册的重试、`compat` 按协议声明门控、`settings/document-updated` 幂等 |
 | `host-integration.spec.mjs` | **真实接缝**：真 `@deepseek-ai/cordis` + 忠实的 `SettingsForms` 接缝替身（0.2.0 的 npm 包没有独立提供方）—— entry 发现、真实 path-op 落盘进 profile entry 配置、写出的 `reasoningEfforts`/`compat` 通过 pi-ai 校验规则 |
 | `client.smoke.mjs` | jsdom：产物工厂材质化、拦截「推理等级」行、面板渲染、拖动/吸附经 `directory.select` 写入、着色、卸载回收 |
+| `settings-compat.spec.mjs` | 官方 0.2.1-rc.2 SettingsForms + 内存 Loader/编辑器夹具：volatile 字段、修订冲突、即时停用与方言更新 |
+| `dsh-compat.spec.mjs` | jsdom 中运行官方 0.2.1-rc.2 ModelSelect、ModelDirectory 和快照 store；传输/基础组件为夹具，覆盖焦点/失焦、RemoteResult 拒绝、嵌套模型标签、失效模型、切换会话和回收 |
+
+上述检查使用隔离夹具，不能替代在运行中的 DSH Desktop 内实际安装插件，也未向真实提供方发送请求。
 
 **贡献.** Fork → 修改 → `pnpm build` → 跑 `pnpm test` → 向 `main` 开 PR。小修复（文档、测试）无需事先讨论；报告问题时附 DSH 版本与具体报错。
 

@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import { useWebglFire } from './useWebglFire.ts'
-import { snapshotOf, type DirectorySelection, type DirectoryState, type EffortLevel, type ModelDirectoryLike } from './directory.ts'
+import { selectEffort, snapshotOf, type DirectoryState, type EffortLevel, type ModelDirectoryLike } from './directory.ts'
 import { PANEL_W, THUMB_W } from './metrics.ts'
 import css from './effort.module.css'
 
@@ -140,24 +140,21 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
   const writeSeqRef = useRef(0)
   const writeErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => {
+    // 已关闭或切换会话后，迟到的失败不能再创建提示定时器。
+    writeSeqRef.current += 1
     if (writeErrorTimerRef.current !== null) clearTimeout(writeErrorTimerRef.current)
   }, [])
   // Continuous 0..100 slider position; snaps to an effort level on release.
   const [rawValue, setRawValue] = useState(0)
 
-  const rawCurrent = state?.current ?? null
-  // 无 current 时回退到第一个分组的第一模型（目录数据总是可用的）。
-  const firstGroup = state?.groups[0]
-  const fallback: DirectorySelection | null = firstGroup?.models[0] === undefined
-    ? null
-    : { provider: firstGroup.id, model: firstGroup.models[0].id }
-  const current = rawCurrent ?? fallback
+  // 0.2.1 的共享目录可能先有模型目录、后有会话投影。绝不能把第一项当作
+  // 当前模型提交，否则一次档位调整会顺带换掉用户的模型。
+  const current = state?.current ?? null
   const group = current === null ? undefined : state?.groups.find((entry) => entry.id === current.provider)
   const model = group?.models.find((entry) => entry.id === current?.model)
   // 目录未声明 reasoning 元数据时使用通用 5 档刻度（宿主侧会为自定义模型供给）
   const declaredEfforts = model?.reasoning?.efforts
   const efforts = declaredEfforts !== undefined && declaredEfforts.length > 0 ? declaredEfforts : UNIVERSAL_EFFORTS
-  const usable = state !== null && current !== null && efforts.length >= 2
 
   // overlay 三分支：加载中 / 加载失败 / 确不支持——环境故障不得被翻译成
   // 「模型不支持」。status 缺失（旧形状快照）且 groups 为空时按加载中处理，
@@ -168,8 +165,11 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
     state === null
     || dirStatus === 'loading'
     || dirStatus === 'idle'
+    || state.routable === null
     || (dirStatus === undefined && (state?.groups.length ?? 0) === 0)
   )
+  const usable = !loadFailed && !dirLoading && current !== null && model !== undefined
+    && state?.routable !== false && efforts.length >= 2
 
   // 宿主 store 自行进入 error 时把原始错误带进 console（UI 只展示统一文案，
   // 不把目录服务的措辞直接推给用户）。
@@ -233,6 +233,12 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
   /** 写入当前档位到会话（供拖动中节流调用）。 */
   const writeEffort = (v: number): void => {
     if (!usable || current === null) return
+    // store 可能已切换模型，而 React 尚未完成下一次渲染；此时不能把旧闭包的
+    // provider/model 再写回去。每笔档位写入都核对当前共享快照。
+    const latest = snapshotOf(directory)
+    if (latest?.current?.provider !== current.provider || latest.current.model !== current.model
+      || latest.routable === false || latest.routable === null
+      || latest.status === 'loading' || latest.status === 'idle') return
     const idx = Math.round(v / step100)
     const effort = efforts[idx]
     if (effort === undefined) return
@@ -247,7 +253,7 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
       clearTimeout(writeErrorTimerRef.current)
       writeErrorTimerRef.current = null
     }
-    void directory.select({
+    void selectEffort(directory, {
       provider: current.provider,
       model: current.model,
       reasoningEffort: effort.id,

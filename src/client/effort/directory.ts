@@ -7,7 +7,8 @@
  * 这两个直连 RPC（ConnectionHandle 已不暴露 `.api`），而是走
  * `ctx.modelDirectories`（ModelDirectoryResolver）暴露的每会话共享目录：
  * 同一个 store 同时驱动 /model 弹层与输入框上方的模型座位，写入走
- * `directory.select(...)`。0.2.0 该面保持不变（store/load/select 同形）。
+ * `directory.select(...)`。0.2.1 的 select 改为返回 RemoteResult，目录另带
+ * routable 表示当前模型是否可用；本插件同时兼容旧版的 Promise<void>。
  */
 
 /** 一档推理等级（宿主目录返回的 effort 条目）。 */
@@ -46,6 +47,8 @@ export interface DirectorySelection {
 export interface DirectoryState {
   /** 生效选择：会话投影或宿主默认值。 */
   current: DirectorySelection | null
+  /** 0.2.1：当前选择是否仍在目录中；null 表示会话投影尚未就绪。 */
+  routable?: boolean | null
   /** 已加载的提供方分组。 */
   groups: readonly DirectoryGroup[]
   /** 进行中的操作生命周期。 */
@@ -63,7 +66,13 @@ export interface ModelDirectoryLike {
   /** 确保宿主目录已加载。 */
   load(): Promise<unknown>
   /** 提交 provider/model/reasoningEffort 选择。 */
-  select(selection: DirectorySelection): Promise<void>
+  select(selection: DirectorySelection): Promise<void | {
+    ok: true
+    value?: unknown
+  } | {
+    ok: false
+    error: { code: string; message: string }
+  }>
 }
 
 /** `ctx.modelDirectories`。 */
@@ -88,7 +97,16 @@ export interface SessionListLike {
 
 /** `ctx.sessions`（只用到当前会话 id）。 */
 export interface SessionsLike {
-  readonly list: { getSnapshot(): SessionListLike }
+  readonly list: {
+    getSnapshot(): SessionListLike
+    subscribe?(listener: () => void): () => void
+  }
+}
+
+/** 兼容旧版 rejection 与 0.2.1 的 RemoteResult，且接住同步抛错。 */
+export async function selectEffort(directory: ModelDirectoryLike, selection: DirectorySelection): Promise<void> {
+  const result = await directory.select(selection)
+  if (result?.ok === false) throw new Error(`${result.error.code}: ${result.error.message}`)
 }
 
 /**
