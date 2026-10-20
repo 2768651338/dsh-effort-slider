@@ -158,7 +158,13 @@ try {
   }, null, 2), 'utf8')
   console.log('ALL LIVE DSH 0.2.1-rc.2 PROFILE CHECKS PASSED')
 } catch (error) {
-  if (page !== undefined && !page.isClosed()) await page.screenshot({ path: join(runRoot, 'failure.png') })
+  if (page !== undefined && !page.isClosed()) {
+    await page.screenshot({ path: join(runRoot, 'failure.png') })
+    const accessibility = await page.locator('body').ariaSnapshot()
+    await writeFile(join(runRoot, 'failure.aria.yml'), accessibility, 'utf8')
+    console.error(accessibility)
+  }
+  console.error('Uncaught browser errors:', pageErrors)
   console.error(serverLog.join('').slice(-12000))
   throw error
 } finally {

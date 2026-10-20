@@ -28,3 +28,15 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Validate the installed plugin in real DSH
         run: pnpm test:live
+      - name: Save live DSH validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-dsh-evidence
+          retention-days: 7
+          if-no-files-found: ignore
+          path: |
+            output/live-dsh/latest.json
+            output/live-dsh/run-*/*.png
+            output/live-dsh/run-*/failure.aria.yml
+            output/live-dsh/run-*/server.log
