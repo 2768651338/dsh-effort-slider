@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -18,6 +18,8 @@ const runtimeRoot = join(root, 'output', 'release', 'runtime')
 const runtimeBin = join(runtimeRoot, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
 const processTemp = join(runRoot, 'process-temp')
 await mkdir(processTemp)
+const documentsDirectory = join(runRoot, 'documents')
+await mkdir(documentsDirectory)
 const env = { ...process.env, DSH_HOME: join(runRoot, 'home'), TEMP: processTemp, TMP: processTemp, TMPDIR: processTemp }
 for (const key of Object.keys(env)) {
   if (/(?:API_KEY|ACCESS_TOKEN|AUTH_TOKEN|SECRET|PASSWORD)$/.test(key)) delete env[key]
@@ -42,6 +44,9 @@ console.log('Installing this package into an isolated DSH web profile')
 command(process.execPath, [runtimeBin, 'plugin', '--profile', 'web', 'add', `file:${root}`])
 const profilePath = join(env.DSH_HOME, 'profiles', 'web', 'cordis.patch.yml')
 await writeFile(profilePath, stringify([
+  // DSH's first-use workspace needs a Documents directory. Configure its real
+  // deployment override so headless Linux and desktop hosts stay isolated.
+  { id: 'workspace-controller', config: { documentsDirectory } },
   { id: 'agent-default-model', config: { provider: 'release-deepseek', model: 'deepseek-chat' } },
   { id: 'llm-pi-ai', config: { providers: { 'release-deepseek': {
     displayName: 'DeepSeek release validation', api: 'openai-completions', baseURL: 'https://api.deepseek.com',
@@ -99,6 +104,8 @@ try {
   await page.getByRole('dialog').getByRole('button', { name: /^(继续|Continue)$/ }).click({ timeout: 60000 })
   const modelTrigger = page.getByRole('button', { name: /(?:选择模型，当前|Select model, current) DeepSeek Chat/ })
   await modelTrigger.click({ timeout: 60000 })
+  assert.ok((await stat(join(documentsDirectory, 'deepseek-harness', 'default-workspace'))).isDirectory(),
+    'DSH creates its real workspace inside the isolated run directory')
   await page.getByRole('menuitem', { name: /^(推理等级|Effort)/ }).click()
   const panel = page.locator('[data-effort-panel="true"]')
   await panel.waitFor({ state: 'visible' })
@@ -152,6 +159,7 @@ try {
   assert.deepEqual(pageErrors, [], 'real app has no uncaught browser errors')
   await writeFile(join(workRoot, 'latest.json'), JSON.stringify({
     dsh: runtimeManifest.version, package: packageManifest.version, runDirectory: runRoot,
+    isolatedWorkspace: true,
     hostProvisioning: true, scopedClientBoot: true, keyboardSelection: true, persistedSelection: true,
     modelPreserved: true, narrowViewport: true, liveDialectUpdate: true, browserErrors: pageErrors,
     scope: 'Configuration, model directory and Session selection; no model generation request was sent.',
