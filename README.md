@@ -7,7 +7,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.5.0-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.1-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -29,6 +29,8 @@ Click the **Effort** row (second row of the official model menu) instead of the 
 | <img src="assets/screenshots/屏幕截图 2026-08-16 190943.png" alt="Effort menu row colored" width="240"> | <img src="assets/screenshots/屏幕截图 2026-08-16 190950.png" alt="Model-seat trigger colored" width="240"> | <img src="assets/screenshots/屏幕截图 2026-08-16 190903.png" alt="Effort slider panel" width="240"> |
 
 ---
+
+> 🩹 **v0.5.1** — Fixed the package name in `cordis.patch.yml` so DSH resolves the scoped npm package (`@txc2768651338/dsh-effort-slider`) during clean-profile installs. Added a regression check that keeps the patch package name aligned with `package.json`.
 
 > 🆕 **v0.5.0** — Evaluation-fix batch. Reliability: the panel splits loading / load-failed / unsupported into three states with a retry button; failed slider writes surface a transient red status instead of failing silently; user config edits made mid-provision are detected (the entry is re-read before `mutate`, conflicting rounds defer); every host provisioning failure path now logs a warning, and an unrecognized Effort row produces a one-time diagnostic. Panel UX: re-anchors on scroll/resize, closes on Esc / outside click / anchor unmount, and clicking the Effort row toggles it; tick dots and labels align with the real snap points; the slider carries `aria-label` / `aria-valuetext`; UI text is bilingual (zh/en, follows `<html lang>`). New `debugReport` option: per-route/per-model provisioning detail plus an optional read-only `llm/stream` tracer logging route/model/effort per request; a `?` help hint in the panel header points at `enabled` / dialect / `debugReport`. Also: GitHub Actions CI (typecheck + tests + build + stale-artifact gate), the WebGL fire no longer burns at 60 fps while invisible, and the npm package is renamed to `@txc2768651338/dsh-effort-slider` (the old unscoped `dsh-effort-slider` name is retired).
 >
