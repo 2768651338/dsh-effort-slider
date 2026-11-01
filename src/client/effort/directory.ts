@@ -109,6 +109,75 @@ export async function selectEffort(directory: ModelDirectoryLike, selection: Dir
   if (result?.ok === false) throw new Error(`${result.error.code}: ${result.error.message}`)
 }
 
+/** Wait for a real catalog refresh without submitting against an unknown model. */
+function readyForSelection(directory: ModelDirectoryLike): Promise<DirectoryState> {
+  return new Promise((resolve, reject) => {
+    let stop: (() => void) | undefined
+    let settled = false
+    const finish = (error?: Error, state?: DirectoryState): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      stop?.()
+      if (error !== undefined) reject(error)
+      else resolve(state!)
+    }
+    const read = (): void => {
+      const state = snapshotOf(directory)
+      if (state !== null && state.current !== null && state.routable !== null
+        && (state.status !== 'error' || state.routable === true)
+        && state.status !== 'loading' && state.status !== 'idle') {
+        finish(undefined, state)
+      } else if (state?.status === 'error') {
+        finish(new Error(state.error ?? 'Model directory refresh failed'))
+      }
+    }
+    const timeout = setTimeout(() => finish(new Error('Model directory refresh timed out')), 10000)
+    stop = directory.store.subscribe(read)
+    if (settled) stop()
+    else read()
+  })
+}
+
+/**
+ * One active selection plus the latest requested value. Settings updates can
+ * refresh the whole DSH catalog mid-drag; wait for it, then validate the actual
+ * model again. Never replay a backlog of obsolete intermediate effort levels.
+ * A committed request can finish after its panel closes, in its owning Session.
+ */
+export function effortWriter(directory: ModelDirectoryLike): (selection: DirectorySelection) => Promise<void> {
+  let pending: DirectorySelection | undefined
+  let active: Promise<void> | undefined
+  const drain = async (): Promise<void> => {
+    while (pending !== undefined) {
+      let submitted = false
+      try {
+        const state = await readyForSelection(directory)
+        const selection = pending
+        pending = undefined
+        submitted = true
+        if (state.current?.provider !== selection.provider || state.current.model !== selection.model
+          || state.routable === false) {
+          throw new Error('The selected model changed before the effort could be saved')
+        }
+        await selectEffort(directory, selection)
+      } catch (error) {
+        if (!submitted) {
+          pending = undefined
+          throw error
+        }
+        // An older failure must not discard a newer pointer/keyboard request.
+        if (pending === undefined) throw error
+      }
+    }
+  }
+  return (selection) => {
+    pending = selection
+    active ??= drain().finally(() => { active = undefined })
+    return active
+  }
+}
+
 /**
  * 解析当前主视图会话 id。0.1.x 直接读 `list.current`；0.2.0 该字段移除
  * （「导航归视图所有」），官方 uiSession 以 `retainedBy.mainView > 0`

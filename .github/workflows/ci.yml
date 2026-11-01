@@ -8,6 +8,16 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - dsh: '0.2.1-rc.4'
+            coinstall: '0'
+          - dsh: '0.2.1-rc.5'
+            coinstall: '1'
+    env:
+      DSH_TEST_VERSION: ${{ matrix.dsh }}
+      DSH_TEST_COINSTALL: ${{ matrix.coinstall }}
     steps:
       - uses: actions/checkout@v4
       # 版本取自 package.json 的 packageManager 字段，避免环境漂移。
@@ -32,11 +42,12 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: live-dsh-evidence
+          name: live-dsh-evidence-${{ matrix.dsh }}
           retention-days: 7
           if-no-files-found: ignore
           path: |
-            output/live-dsh/latest.json
-            output/live-dsh/run-*/*.png
-            output/live-dsh/run-*/failure.aria.yml
-            output/live-dsh/run-*/server.log
+            output/live-dsh/**/latest*.json
+            output/live-dsh/**/run-*/*.png
+            output/live-dsh/**/run-*/failure.aria.yml
+            output/live-dsh/**/run-*/server.log
+            output/live-dsh/**/run-*/pointer-trace.json

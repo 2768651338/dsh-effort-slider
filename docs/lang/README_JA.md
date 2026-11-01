@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.5.1-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.2-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -36,7 +36,9 @@
 
 ---
 
-> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** に対応。volatile 設定、リビジョン付き書き込み、`RemoteResult`、モデル名の着色とフォーカスを修正。スコープ付きパッケージ名とクライアント登録名を統一。`pnpm test:live` は実際の DSH とブラウザーを起動して検証。
+> 🔧 **v0.5.2** — DSH **0.2.1-rc.4 / rc.5** に対応。npm 0.5.1 の古い成果物によるファクトリー重複登録を修正し、`prepack` で再ビルドと実際のクライアント ID 検査を実行。カタログ更新中もマウス操作を維持し、書き込みは最新の待機値だけを残して順次実行します。
+>
+> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** に対応。volatile 設定、リビジョン付き書き込み、`RemoteResult`、モデル名の着色とフォーカスを修正。`pnpm test:live` は実際の DSH とブラウザーを起動して検証。
 >
 > 🆕 **v0.5.0** — 評価修正バッチ。信頼性：パネルは「読み込み中 / 読み込み失敗 / 非対応」を 3 状態に分けて再試行ボタンを付属；スライダーの書き込み失敗時はヘッダー状態が一瞬赤くなり、サイレント失敗しない；供給中のユーザー設定同時編集を検出（`mutate` 前にエントリを再読み込み、競合ラウンドは譲る）；ホスト供給の全失敗パスが警告を記録し、認識できなかった Effort 行は 1 回だけ診断を出力。パネル操作：スクロール/リサイズに追従して再配置、Esc / 外側クリック / アンカーのアンマウントで閉じ、Effort 行の再クリックでトグル；目盛り点とラベルは実際のスナップ位置に整合；スライダーは `aria-label` / `aria-valuetext` を持ち、UI 文言は二言語（zh/en、`<html lang>` に追従）。新オプション `debugReport`：ルート/モデル別の供給詳細に加え、任意の読み取り専用 `llm/stream` トレーサーがリクエストごとに route/model/effort を記録；パネルヘッダーの「?」ヒントは `enabled` / ダイアレクト / `debugReport` の調査手順を指す。その他：GitHub Actions CI（typecheck + テスト + ビルド + 成果物新鮮度ゲート）を追加；パネル表示中でも不可視の WebGL 炎は 60fps で空焼きしない；npm パッケージは `@txc2768651338/dsh-effort-slider` に改名（旧スコープなし名 `dsh-effort-slider` は廃止）。
 >
@@ -101,7 +103,7 @@
 
 | 項目 | 値 |
 | --- | --- |
-| DSH バージョン | **0.2.1-rc.2**（npm `latest` dist-tag。このビルドが検証対象としたバージョン）、Windows の web プロファイル |
+| DSH バージョン | **0.2.1-rc.4 / 0.2.1-rc.5**、Windows の web プロファイル。開発用の型は rc.5 に固定 |
 | 動作しない | DSH ≤ 0.1.5 — v0.4.0 は 0.2.0 で導入された `SettingsForms` settings サービスを対象とします（DSH 0.1.5 には v0.3.0 を使用。v0.2.5 以前はさらに `@deepseek-ai/dsh-client-runtime` を import しますが、このパッケージは 0.1.1-rc.2 以降に削除されました） |
 | インストール機構 | `dsh plugin --profile web add`（バンドルパッチ + ホスト/ブラウザの 2 半区） |
 | 依存 | `ctx.sessions`（`@deepseek-ai/dsh-api-session-controller`）と `ctx.modelDirectories`（`@deepseek-ai/dsh-client-ui-model-selection`）。ホスト側：`ctx.llm`、`ctx.settings`（`SettingsForms`） |
@@ -214,7 +216,7 @@ test/                      host.spec.mjs ホスト単体 + host-apply.spec.mjs +
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js（ホスト半区）+ lib/client.js（ブラウザ半区）
-pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.2.1-rc.2 に対してグリーン）
+pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.2.1-rc.5）
 pnpm test        # パッケージ名、再現可能なビルド、供給の純ロジック
 pnpm test:live   # 実際の DSH とブラウザー（Chromium が必要。Windows は Edge）
 ```
@@ -226,7 +228,7 @@ pnpm test:live   # 実際の DSH とブラウザー（Chromium が必要。Windo
 | `host.spec.mjs` | 純ロジック：方言 → ワイヤマッピング、供給パッチ生成、冪等性 |
 | `package-config.spec.mjs` | 実際の bundle YAML からパッケージ名を確認 |
 | `build-determinism.mjs` | 異なるディレクトリで生成した成果物をバイト単位で比較 |
-| `live-profile.spec.mjs` | DSH 0.2.1-rc.2 をインストールし、実際の UI、保存、ライブ更新を確認 |
+| `live-profile.spec.mjs` | DSH rc.4 / rc.5 に npm パッケージを導入し、実際のマウス・キー操作、保存、ライブ更新を確認 |
 
 CI は両方を実行します。実行環境、profile、画像は `output/` に保存し、モデル生成リクエストは送りません。過去のテストダブルはリリース検証に含めません。
 

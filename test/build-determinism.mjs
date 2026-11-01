@@ -6,6 +6,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { workRoot as testWorkspace, processTemp } from './workspace.mjs'
 
 let failures = 0
 function assert(condition, message) {
@@ -30,6 +31,7 @@ async function buildCheckout(directory) {
   const result = spawnSync(process.execPath, [tsdownCli, '--config', './tsdown.config.ts'], {
     cwd: directory,
     encoding: 'utf8',
+    env: { ...process.env, TEMP: processTemp, TMP: processTemp, TMPDIR: processTemp },
   })
   assert(result.status === 0, `build succeeds in ${basename(directory)}`)
   if (result.status !== 0) console.error(result.stderr || result.stdout)
@@ -37,7 +39,8 @@ async function buildCheckout(directory) {
   return Promise.all(artifacts.map((file) => readFile(join(directory, 'lib', file))))
 }
 
-const workRoot = resolve(root, 'output', 'build-determinism')
+const workRoot = join(testWorkspace, 'build-determinism')
+await mkdir(processTemp, { recursive: true })
 await mkdir(workRoot, { recursive: true })
 const temporary = await mkdtemp(join(workRoot, 'checkouts-'))
 try {

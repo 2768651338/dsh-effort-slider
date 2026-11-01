@@ -4,9 +4,9 @@
  * 点击官方模型菜单的「推理等级」行时弹出本面板（替代官方档位列表）；
  * 拖动过程连续无级，松手时吸附到最近的档位。
  */
-import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useWebglFire } from './useWebglFire.ts'
-import { selectEffort, snapshotOf, type DirectoryState, type EffortLevel, type ModelDirectoryLike } from './directory.ts'
+import { effortWriter, snapshotOf, type DirectoryState, type EffortLevel, type ModelDirectoryLike } from './directory.ts'
 import { PANEL_W, THUMB_W } from './metrics.ts'
 import css from './effort.module.css'
 
@@ -128,8 +128,28 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
   const { sessionId, directory, onClose, onEffortChange } = props
   // 按界面语言取文案（每次渲染读取一次，语言切换后面板重开即生效）。
   const t = STRINGS[isZhUi() ? 'zh' : 'en']
-  const { state, loadFailed, reload } = useDirectory(directory)
+  const { state: liveState, loadFailed, reload } = useDirectory(directory)
   const [dragging, setDragging] = useState(false)
+  const draggingRef = useRef(false)
+  const gestureModel = useRef<{ provider: string; model: string } | null>(null)
+  const saveEffort = useMemo(() => effortWriter(directory), [directory])
+  const lastReadyState = useRef<DirectoryState | null>(null)
+  if (liveState?.current !== null && liveState?.current !== undefined
+    && liveState.routable !== false && liveState.routable !== null
+    && liveState.status !== 'idle' && liveState.status !== 'loading' && liveState.status !== 'error') {
+    lastReadyState.current = liveState
+  }
+  // DSH refreshes its catalog after a blank Session changes the default effort.
+  // Preserve the active native gesture while that refresh is pending. Writes
+  // still wait for, and validate, the real directory rather than this display.
+  const retained = lastReadyState.current
+  const keepGesture = draggingRef.current && !loadFailed && retained !== null
+    && gestureModel.current?.provider === retained.current?.provider && gestureModel.current?.model === retained.current?.model
+    && liveState?.status !== 'error' && liveState?.routable !== false
+    && (liveState?.current == null || (
+      liveState.current.provider === retained.current?.provider && liveState.current.model === retained.current.model
+    ))
+  const state = keepGesture ? retained : liveState
   // 「拖动无效」排查提示的开合（P3-2）：? 按钮切换，tooltip 覆盖在轨道上方，
   // 不挤压面板布局。
   const [helpOpen, setHelpOpen] = useState(false)
@@ -170,6 +190,7 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
   )
   const usable = !loadFailed && !dirLoading && current !== null && model !== undefined
     && state?.routable !== false && efforts.length >= 2
+    && (!draggingRef.current || (gestureModel.current?.provider === current.provider && gestureModel.current.model === current.model))
 
   // 宿主 store 自行进入 error 时把原始错误带进 console（UI 只展示统一文案，
   // 不把目录服务的措辞直接推给用户）。
@@ -191,17 +212,20 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
   const syncedEffortRef = useRef<string | null>(null)
   useEffect(() => {
     if (!usable || currentEffortId === undefined) return
+    // Live selections publish older intermediate snapshots while the pointer
+    // is still moving. They must not move the native range out from under it.
+    if (draggingRef.current) return
     // 目录就绪后把当前档位上报给外层（供菜单行着色）。
     onEffortChange?.(currentEffortId)
-    // 本面板刚写出去的档位：不回写滑块（否则会把滑块从指针下抢走）。
-    if (writtenEffortRef.current === currentEffortId) return
+    // Ignore intermediate frames until the last requested effort is projected.
+    if (writtenEffortRef.current !== null && writtenEffortRef.current !== currentEffortId) return
     // 外部（官方入口 / 宿主）改过档位：撤掉「刚写出去」的标记，恢复正常同步。
     writtenEffortRef.current = null
     if (syncedEffortRef.current === currentEffortId) return
     syncedEffortRef.current = currentEffortId
     setRawValue(initialRaw)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, usable, currentEffortId, initialRaw])
+  }, [state, usable, currentEffortId, initialRaw, writeError])
 
   const displayIndex = usable ? Math.round(rawValue / step100) : 0
   const level = efforts[displayIndex]
@@ -236,9 +260,7 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
     // store 可能已切换模型，而 React 尚未完成下一次渲染；此时不能把旧闭包的
     // provider/model 再写回去。每笔档位写入都核对当前共享快照。
     const latest = snapshotOf(directory)
-    if (latest?.current?.provider !== current.provider || latest.current.model !== current.model
-      || latest.routable === false || latest.routable === null
-      || latest.status === 'loading' || latest.status === 'idle') return
+    if (latest?.current != null && (latest.current.provider !== current.provider || latest.current.model !== current.model)) return
     const idx = Math.round(v / step100)
     const effort = efforts[idx]
     if (effort === undefined) return
@@ -253,7 +275,7 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
       clearTimeout(writeErrorTimerRef.current)
       writeErrorTimerRef.current = null
     }
-    void selectEffort(directory, {
+    void saveEffort({
       provider: current.provider,
       model: current.model,
       reasoningEffort: effort.id,
@@ -261,6 +283,7 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
       console.warn('[effort-slider] selectModel failed:', error)
       // 已被更新的写入取代：旧写入的迟到拒绝不再显示。
       if (seq !== writeSeqRef.current) return
+      writtenEffortRef.current = null
       // 不回退滑块位置（用户可直接重拖）；header 状态文字短暂切换为错误态。
       setWriteError(true)
       writeErrorTimerRef.current = setTimeout(() => {
@@ -285,11 +308,12 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
 
   /** 松手/失焦/键盘结束时吸附到最近档位并补发一次确认。 */
   const commit = (event: React.SyntheticEvent<HTMLInputElement>): void => {
+    draggingRef.current = false
+    setDragging(false)
     if (!usable) return
     const v = Number((event.target as HTMLInputElement).value)
     const idx = Math.round(v / step100)
     setRawValue(idx * step100)
-    setDragging(false)
     writeEffort(v)
   }
 
@@ -393,9 +417,13 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
             aria-valuetext={usable && level !== undefined ? displayName(level) : undefined}
             className={`${css.range}${dragging ? ` ${css.rangeGlow}` : ''}`}
             onInput={onInput}
-            onPointerDown={() => setDragging(true)}
+            onPointerDown={() => {
+              gestureModel.current = current === null ? null : { provider: current.provider, model: current.model }
+              draggingRef.current = true
+              setDragging(true)
+            }}
             onPointerUp={commit}
-            onPointerLeave={() => setDragging(false)}
+            onPointerCancel={commit}
             onBlur={commit}
           />
         </div>

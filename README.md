@@ -7,7 +7,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.5.1-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.2-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -30,7 +30,9 @@ Click the **Effort** row (second row of the official model menu) instead of the 
 
 ---
 
-> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** compatibility: volatile settings with live updates, revision-checked provisioning, resolved `RemoteResult` failures, nested model-label slots, menu focus/blur integration, and safe handling of unavailable models and Session changes. The bundle patch and client registration now use the same scoped package name. Live provisioning queues settings writes outside the active HMR transaction; CSS names and source maps stay stable across checkout paths. Includes real DSH browser validation.
+> 🔧 **v0.5.2** — Update the DSH development baseline to **0.2.1-rc.5** and validate packed releases on **rc.4 / rc.5**. Fix the stale npm 0.5.1 client artifact that still registered `dsh-effort-slider`, causing duplicate factory registration and a desktop startup reload loop. Packing now rebuilds the client and checks the actual JavaScript registration against the manifest, so a stale unscoped bundle cannot ship again. Mouse dragging now survives catalog refreshes triggered by live effort writes; requests are serialized with only the latest pending level retained, and the current model is checked again before saving.
+>
+> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** compatibility: volatile settings with live updates, revision-checked provisioning, resolved `RemoteResult` failures, nested model-label slots, menu focus/blur integration, and safe handling of unavailable models and Session changes. The source build configuration uses the scoped package name; the stale npm artifact is corrected in v0.5.2. Live provisioning queues settings writes outside the active HMR transaction; CSS names and source maps stay stable across checkout paths. Includes real DSH browser validation.
 >
 > 🆕 **v0.5.0** — Evaluation-fix batch. Reliability: the panel splits loading / load-failed / unsupported into three states with a retry button; failed slider writes surface a transient red status instead of failing silently; user config edits made mid-provision are detected (the entry is re-read before `mutate`, conflicting rounds defer); every host provisioning failure path now logs a warning, and an unrecognized Effort row produces a one-time diagnostic. Panel UX: re-anchors on scroll/resize, closes on Esc / outside click / anchor unmount, and clicking the Effort row toggles it; tick dots and labels align with the real snap points; the slider carries `aria-label` / `aria-valuetext`; UI text is bilingual (zh/en, follows `<html lang>`). New `debugReport` option: per-route/per-model provisioning detail plus an optional read-only `llm/stream` tracer logging route/model/effort per request; a `?` help hint in the panel header points at `enabled` / dialect / `debugReport`. Also: GitHub Actions CI (typecheck + tests + build + stale-artifact gate), the WebGL fire no longer burns at 60 fps while invisible, and the npm package is renamed to `@txc2768651338/dsh-effort-slider` (the old unscoped `dsh-effort-slider` name is retired).
 >
@@ -103,7 +105,7 @@ has no wire effect there:
 
 | Item | Value |
 | --- | --- |
-| DSH version | **0.2.1-rc.2** (the npm `latest` dist-tag; the version this build is verified against), web profile on Windows |
+| DSH version | **0.2.1-rc.4 / 0.2.1-rc.5**; development types pinned to rc.5, real web profiles on Windows |
 | Broken on | DSH ≤ 0.1.5 — v0.4.0 targets the `SettingsForms` settings service introduced in 0.2.0 (use v0.3.0 for DSH 0.1.5; v0.2.5 and earlier also import `@deepseek-ai/dsh-client-runtime`, which was removed after 0.1.1-rc.2) |
 | Install mechanism | `dsh plugin --profile web add` (bundle patch + dual half) |
 | Depends on | `ctx.sessions` (`@deepseek-ai/dsh-api-session-controller`) and `ctx.modelDirectories` (`@deepseek-ai/dsh-client-ui-model-selection`); host: `ctx.llm`, `ctx.settings` (`SettingsForms`) |
@@ -185,10 +187,12 @@ effort-slider:
 
 | Symptom | Fix |
 | --- | --- |
+| `duplicate factory registration for "dsh-effort-slider"` followed by `web boot: 1 entry did not activate` | npm 0.5.1 shipped a stale client factory with the unscoped name. Install the rebuilt v0.5.2 package into the affected profile, then restart DSH. Repeated reloads cannot correct the installed artifact. The unscoped `dsh-effort-slider` npm package is maintained separately; this project's factory id must be `@txc2768651338/dsh-effort-slider` |
 | No Effort row in the model menu | The model declares no reasoning metadata and host provisioning is not in effect — confirm DSH was restarted and check `enabled` on the plugin's settings page (its profile entry config); set `debugReport: true` and check the host log for the per-model provisioning report |
 | Panel says 「当前模型不支持思考强度调节」 | Universal fallback not active — upgrade to v0.2.0+ and restart |
 | Plugin does not load at all (row shows `disabled: true`) | An earlier build was switched off in `~/.dsh/profiles/web/cordis.patch.yml`; delete that row and restart |
 | Dragging has no effect | Check whether the target endpoint's wire dialect matches (see the dialect table — dialects translate only on `api: openai-completions` routes) or set `defaultDialect` for that route. With `debugReport: true` the host log covers the whole chain you can verify: the per-model report states exactly what was written (or skipped, and why) and flags routes where the dialect does not apply, and `[debug] request route=… model=… effort=…` lines prove which level each call carries. That leaves only the wire translation inside pi-ai, which no plugin can observe. The panel's `?` button repeats this checklist |
+| Another slider appears after this package is installed | The separately maintained unscoped `dsh-effort-slider` also uses the `ui-effort-slider` entry and the same CSS tag. In DSH's plugin manager, disable that competing bundle, keep `@txc2768651338/dsh-effort-slider` enabled, and fully restart DSH. Its package can remain installed. Installation coexistence does not mean both sliders can control the same menu |
 | Conflicts with other skin plugins | If another skin that intercepts the Effort row is installed (e.g. the aurora skin of dsh-ui-web), disable its interception to avoid double panels |
 | Version still shows old after restart | `file:` installs are snapshot copies — use the `github:` spec or re-run `add` before restarting |
 | Where are the logs? | Host errors: DSH startup log (with `debugReport: true`, provisioning details and per-request effort traces are logged as `effort-slider: [debug]` lines); client errors: browser DevTools (F12) Console (`[effort-slider]` prefix) |
@@ -219,24 +223,25 @@ test/                      host.spec.mjs unit tests + host-apply.spec.mjs + clie
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js (host half) + lib/client.js (browser half)
-pnpm typecheck   # tsc --noEmit (green against @deepseek-ai/* 0.2.1-rc.2)
+pnpm typecheck   # tsc --noEmit against @deepseek-ai/* 0.2.1-rc.5
 pnpm test        # package identity, reproducible builds, and pure provisioning logic
 pnpm exec playwright install chromium # once, when Chromium is not installed (Windows uses Edge)
-pnpm test:live   # install this package into the published DSH app and operate its real browser UI
+pnpm test:live   # pack and install this release in real DSH 0.2.1-rc.5, then operate its UI
+# Set DSH_TEST_VERSION=0.2.1-rc.4 to validate the desktop log's runtime version.
 ```
 
 `test/` layers, cheapest first:
 
 | File | Scope |
 | --- | --- |
-| `package-config.spec.mjs` | Parse the actual bundle YAML with the YAML library and check its distribution package identity |
+| `package-config.spec.mjs` | Parse the bundle YAML and shipped JavaScript with YAML/TypeScript; require one factory with the scoped distribution package identity and a prepack build gate |
 | `build-determinism.mjs` | Build unchanged sources in two workspace directories and compare all three artifacts byte for byte |
 | `host.spec.mjs` | Pure logic: dialect → wire mapping, provisioning patch generation, idempotency |
-| `live-profile.spec.mjs` | Launch published DSH 0.2.1-rc.2, install this package with its CLI, and operate the real UI in Edge/Chromium: scoped client boot, settings persistence, keyboard/focus behavior, reload, a narrow viewport, and live dialect updates |
+| `live-profile.spec.mjs` | Launch published DSH rc.4 / rc.5, install the actual npm-packed tarball with its CLI, and operate the real UI in Edge/Chromium: scoped client boot, mouse/keyboard OFF/MAX persistence, outside click/Escape, reload, a narrow viewport, and live dialect updates. Set `DSH_TEST_COINSTALL=1` to install the separate unscoped slider alongside this package |
 
-CI runs both test commands. Live validation stores its runtime, profile, screenshots and report under ignored `output/`; it checks configuration, the model directory and Session selection without sending a model generation request. Historical fixture tests are excluded from the release checks.
+CI runs both test commands for rc.4 and rc.5. On Windows, test runtimes, profiles, screenshots and reports go under `E:\Codex\Workspace\dsh-effort-slider-20261101`, with process temporary files under `E:\Codex\Temp`; other platforms use ignored `output/`. Set `DSH_TEST_WORKSPACE` to override the evidence directory. Live checks cover configuration, the model directory and Session selection without sending a model generation request. Historical fixture tests are excluded from the release checks. `npm pack` and publishing run `prepack`, rebuilding and checking the shipped artifact.
 
-The hot-update bridge feature-detects DSH 0.2.1's internal HMR transaction context before enqueueing work. Settings writes still use the revision-checked public API and its exclusive queue. The live test pins DSH 0.2.1-rc.2 so changes to that internal context are caught when updating the supported version.
+The hot-update bridge feature-detects DSH 0.2.1's internal HMR transaction context before enqueueing work. Settings writes still use the revision-checked public API and its exclusive queue. The live test defaults to rc.5; CI also pins rc.4 so changes to that internal context are caught when updating the supported version.
 
 **Contributing.** Fork → change → `pnpm build` → run `pnpm test` → open a PR against `main`. Small fixes (docs, tests) are welcome without prior discussion; report issues with the DSH version and the exact error.
 

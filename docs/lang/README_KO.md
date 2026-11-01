@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.5.1-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.2-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -36,7 +36,9 @@
 
 ---
 
-> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** 호환: volatile 설정, 리비전 검사, `RemoteResult`, 모델 이름 및 포커스 수정. 패키지 이름과 클라이언트 등록 이름을 통일. `pnpm test:live`로 실제 DSH와 브라우저에서 검증.
+> 🔧 **v0.5.2** — DSH **0.2.1-rc.4 / rc.5** 지원. npm 0.5.1의 오래된 결과물로 인한 중복 팩터리 등록을 수정하고, `prepack`에서 다시 빌드한 뒤 실제 클라이언트 ID를 검사합니다. 카탈로그 새로고침 중에도 드래그를 유지하며, 쓰기는 최신 대기 값만 남겨 순서대로 실행합니다.
+>
+> 🔧 **v0.5.1** — DSH **0.2.1-rc.2** 호환: volatile 설정, 리비전 검사, `RemoteResult`, 모델 이름 및 포커스 수정. `pnpm test:live`로 실제 DSH와 브라우저에서 검증.
 >
 > 🆕 **v0.5.0** — 평가 수정 배치. 신뢰성: 패널이 로드 중 / 로드 실패 / 미지원을 세 상태로 분리하고 재시도 버튼을 제공; 슬라이더 쓰기 실패 시 헤더 상태가 잠시 빨갛게 표시되어 조용히 실패하지 않음; 공급 중 사용자 설정 동시 편집을 감지(`mutate` 전에 항목을 재판독, 충돌 라운드는 양보); 호스트 공급의 모든 실패 경로가 경고를 기록하고, 인식되지 않은 Effort 행은 1회성 진단을 출력. 패널 UX: 스크롤/리사이즈에 따라 재배치되고, Esc / 외부 클릭 / 앵커 언마운트 시 닫히며, Effort 행을 다시 누르면 토글; 눈금 점과 레이블이 실제 스냅 위치에 정렬; 슬라이더에 `aria-label` / `aria-valuetext` 제공, UI 문구는 이중 언어(zh/en, `<html lang>` 따름). 새 옵션 `debugReport`: 라우트/모델별 공급 상세와 선택적 읽기 전용 `llm/stream` 트레이서가 요청별로 route/model/effort를 기록; 패널 헤더의 `?` 도움말은 `enabled` / 다이얼렉트 / `debugReport` 점검 절차를 안내. 그 외: GitHub Actions CI(typecheck + 테스트 + 빌드 + 산출물 신선도 게이트) 추가; 패널이 열려 있어도 보이지 않는 WebGL 불꽃은 60fps로 헛돌지 않음; npm 패키지명이 `@txc2768651338/dsh-effort-slider`로 변경(구 스코프 없는 이름 `dsh-effort-slider` 폐지).
 >
@@ -100,7 +102,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| DSH 버전 | **0.2.1-rc.2**（npm `latest` dist-tag, 이 빌드가 검증한 버전）, Windows의 web 프로필 |
+| DSH 버전 | **0.2.1-rc.4 / 0.2.1-rc.5**, Windows web 프로필; 개발 타입은 rc.5로 고정 |
 | 미지원 | DSH ≤ 0.1.5 — v0.4.0은 0.2.0에서 도입된 `SettingsForms` settings 서비스를 대상으로 함（DSH 0.1.5에는 v0.3.0 사용. v0.2.5 이하는 추가로 `@deepseek-ai/dsh-client-runtime`을 import하며 이 패키지는 0.1.1-rc.2 이후 제거됨） |
 | 설치 방식 | `dsh plugin --profile web add`（번들 패치 + 호스트/브라우저 더블 하프） |
 | 의존 | `ctx.sessions`（`@deepseek-ai/dsh-api-session-controller`）와 `ctx.modelDirectories`（`@deepseek-ai/dsh-client-ui-model-selection`）. 호스트: `ctx.llm`, `ctx.settings`（`SettingsForms`） |
@@ -213,7 +215,7 @@ test/                      host.spec.mjs 호스트 단위 + host-apply.spec.mjs 
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js（호스트 측） + lib/client.js（브라우저 측）
-pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.2.1-rc.2 기준 그린）
+pnpm typecheck   # tsc --noEmit（@deepseek-ai/* 0.2.1-rc.5）
 pnpm test        # 패키지 이름, 재현 가능한 빌드, 순수 프로비저닝 로직
 pnpm test:live   # 실제 DSH와 브라우저 (Chromium 설치 필요; Windows는 Edge 사용)
 ```
@@ -225,7 +227,7 @@ pnpm test:live   # 실제 DSH와 브라우저 (Chromium 설치 필요; Windows�
 | `host.spec.mjs` | 순수 로직: 다이얼렉트 → 와이어 매핑, 프로비저닝 패치 생성, 멱등성 |
 | `package-config.spec.mjs` | 실제 bundle YAML의 패키지 이름 검증 |
 | `build-determinism.mjs` | 서로 다른 경로에서 빌드한 산출물을 바이트 단위로 비교 |
-| `live-profile.spec.mjs` | DSH 0.2.1-rc.2 설치 후 실제 UI, 저장, 실시간 설정 변경 검증 |
+| `live-profile.spec.mjs` | DSH rc.4 / rc.5에 npm 패키지를 설치하고 실제 마우스/키보드 조작, 저장, 실시간 설정 변경 검증 |
 
 CI는 두 명령을 모두 실행합니다. 실행 환경, profile, 스크린샷은 `output/`에 저장하며 모델 생성 요청은 보내지 않습니다. 기존 테스트 더블은 릴리스 검증에서 제외합니다.
 

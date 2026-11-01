@@ -9,15 +9,17 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
 import { parse, stringify } from 'yaml'
+import { workRoot as testWorkspace, processTemp } from './workspace.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const workRoot = join(root, 'output', 'live-dsh')
+const dshVersion = process.env.DSH_TEST_VERSION ?? '0.2.1-rc.5'
+assert.match(dshVersion, /^\d+\.\d+\.\d+(?:-[\w.]+)?$/)
+const workRoot = join(testWorkspace, 'live-dsh', dshVersion)
 await mkdir(workRoot, { recursive: true })
 const runRoot = await mkdtemp(join(workRoot, 'run-'))
-const runtimeRoot = join(root, 'output', 'release', 'runtime')
+const runtimeRoot = join(testWorkspace, 'runtimes', dshVersion)
 const runtimeBin = join(runtimeRoot, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
-const processTemp = join(runRoot, 'process-temp')
-await mkdir(processTemp)
+await mkdir(processTemp, { recursive: true })
 const documentsDirectory = join(runRoot, 'documents')
 await mkdir(documentsDirectory)
 const env = { ...process.env, DSH_HOME: join(runRoot, 'home'), TEMP: processTemp, TMP: processTemp, TMPDIR: processTemp }
@@ -32,16 +34,25 @@ function command(executable, args, options = {}) {
 }
 
 if (!existsSync(runtimeBin)) {
-  console.log('Installing published DSH 0.2.1-rc.2 into output/release/runtime')
-  command('npm', ['install', '--prefix', 'output/release/runtime', '--no-save', '--no-audit', '--no-fund',
-    '@deepseek-ai/dsh@0.2.1-rc.2', '@deepseek-ai/dsh-llm-pi-ai@0.2.1-rc.2', '--registry=https://registry.npmjs.org'],
+  console.log(`Installing published DSH ${dshVersion} into ${runtimeRoot}`)
+  command('npm', ['install', '--prefix', runtimeRoot, '--no-save', '--no-audit', '--no-fund',
+    `@deepseek-ai/dsh@${dshVersion}`, `@deepseek-ai/dsh-llm-pi-ai@${dshVersion}`, '--registry=https://registry.npmjs.org'],
   { shell: process.platform === 'win32' })
 }
 const runtimeManifest = JSON.parse(await readFile(join(runtimeRoot, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), 'utf8'))
-assert.equal(runtimeManifest.version, '0.2.1-rc.2')
+assert.equal(runtimeManifest.version, dshVersion)
 const packageManifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
-console.log('Installing this package into an isolated DSH web profile')
-command(process.execPath, [runtimeBin, 'plugin', '--profile', 'web', 'add', `file:${root}`])
+// Exercise npm's real prepack lifecycle and install the exact delivery artifact.
+// file:directory alone would not catch a stale or incomplete published tarball.
+command('npm', ['pack', '--pack-destination', runRoot], { shell: process.platform === 'win32' })
+const archive = join(runRoot, `txc2768651338-dsh-effort-slider-${packageManifest.version}.tgz`)
+assert.ok(existsSync(archive), 'npm pack produced the release archive')
+console.log('Installing the packed release into an isolated DSH web profile')
+if (process.env.DSH_TEST_COINSTALL === '1') {
+  console.log('Installing published dsh-effort-slider@1.3.1 alongside the scoped package')
+  command(process.execPath, [runtimeBin, 'plugin', '--profile', 'web', 'add', 'dsh-effort-slider@1.3.1'])
+}
+command(process.execPath, [runtimeBin, 'plugin', '--profile', 'web', 'add', `file:${archive}`])
 const profilePath = join(env.DSH_HOME, 'profiles', 'web', 'cordis.patch.yml')
 await writeFile(profilePath, stringify([
   // DSH's first-use workspace needs a Documents directory. Configure its real
@@ -120,6 +131,48 @@ try {
   assert.equal(defaultOf(await profile()).provider, 'release-deepseek')
   await readySlider.waitFor({ state: 'visible' })
   assert.equal(Number(await slider.inputValue()), 100, 'directory refresh restores the selected max level')
+  await slider.evaluate((input) => {
+    const trace = []
+    window.__effortPointerTrace = trace
+    const record = (event) => trace.push({
+      event, time: performance.now(), value: input.value,
+      disabled: input.disabled, connected: input.isConnected,
+    })
+    for (const name of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'input', 'change', 'blur']) {
+      input.addEventListener(name, () => record(name), true)
+    }
+    new MutationObserver(() => record('disabled-attribute')).observe(input, { attributes: true, attributeFilter: ['disabled'] })
+    record('start')
+  })
+  let sliderBounds = await slider.boundingBox()
+  assert.ok(sliderBounds, 'slider has visible bounds')
+  await page.mouse.move(sliderBounds.x + sliderBounds.width - 14, sliderBounds.y + sliderBounds.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(sliderBounds.x + 14, sliderBounds.y + sliderBounds.height / 2, { steps: 20 })
+  console.log('mouse drag to off: displayed input', await slider.inputValue())
+  await page.mouse.up()
+  await waitProfile((value) => defaultOf(value).reasoningEffort === 'off', 'Mouse drag did not persist off')
+  await readySlider.waitFor({ state: 'visible' })
+  assert.equal(Number(await slider.inputValue()), 0)
+  sliderBounds = await slider.boundingBox()
+  assert.ok(sliderBounds, 'slider remains visible after off')
+  await page.mouse.move(sliderBounds.x + 14, sliderBounds.y + sliderBounds.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(sliderBounds.x + sliderBounds.width - 14, sliderBounds.y + sliderBounds.height / 2, { steps: 20 })
+  console.log('mouse drag to max: displayed input', await slider.inputValue())
+  await page.mouse.up()
+  await waitProfile((value) => defaultOf(value).reasoningEffort === 'max', 'Mouse drag did not persist max')
+  await readySlider.waitFor({ state: 'visible' })
+  assert.equal(Number(await slider.inputValue()), 100)
+  await writeFile(join(runRoot, 'pointer-trace.json'), JSON.stringify(
+    await page.evaluate(() => window.__effortPointerTrace ?? []), null, 2), 'utf8')
+  await page.mouse.click(10, 10)
+  await panel.waitFor({ state: 'detached' })
+  await modelTrigger.click()
+  await page.getByRole('menuitem', { name: /^(推理等级|Effort)/ }).click()
+  await readySlider.waitFor({ state: 'visible' })
+  console.log('ok: outside click closes the panel')
+  console.log('ok: real mouse drag persists off and max')
   const colors = await modelTrigger.evaluate((trigger) => [...trigger.children]
     .filter((child) => child.tagName === 'SPAN').map((child) => child.style.color))
   assert.equal(colors[0], '', 'model label keeps its own styling')
@@ -157,16 +210,19 @@ try {
   await writeFile(profilePath, stringify(changed), 'utf8')
   await waitProfile((value) => piAiOf(value).models[0].compat.thinkingFormat === 'qwen', 'Live dialect update did not reach the provider')
   assert.deepEqual(pageErrors, [], 'real app has no uncaught browser errors')
-  await writeFile(join(workRoot, 'latest.json'), JSON.stringify({
+  await writeFile(join(workRoot, process.env.DSH_TEST_COINSTALL === '1' ? 'latest-coinstall.json' : 'latest.json'), JSON.stringify({
     dsh: runtimeManifest.version, package: packageManifest.version, runDirectory: runRoot,
     isolatedWorkspace: true,
     hostProvisioning: true, scopedClientBoot: true, keyboardSelection: true, persistedSelection: true,
-    modelPreserved: true, narrowViewport: true, liveDialectUpdate: true, browserErrors: pageErrors,
+    modelPreserved: true, narrowViewport: true, liveDialectUpdate: true, mouseSelection: true,
+    outsideClick: true, coinstalled: process.env.DSH_TEST_COINSTALL === '1', browserErrors: pageErrors,
     scope: 'Configuration, model directory and Session selection; no model generation request was sent.',
   }, null, 2), 'utf8')
-  console.log('ALL LIVE DSH 0.2.1-rc.2 PROFILE CHECKS PASSED')
+  console.log(`ALL LIVE DSH ${dshVersion} PROFILE CHECKS PASSED`)
 } catch (error) {
   if (page !== undefined && !page.isClosed()) {
+    const pointerTrace = await page.evaluate(() => window.__effortPointerTrace ?? [])
+    await writeFile(join(runRoot, 'pointer-trace.json'), JSON.stringify(pointerTrace, null, 2), 'utf8')
     await page.screenshot({ path: join(runRoot, 'failure.png') })
     const accessibility = await page.locator('body').ariaSnapshot()
     await writeFile(join(runRoot, 'failure.aria.yml'), accessibility, 'utf8')

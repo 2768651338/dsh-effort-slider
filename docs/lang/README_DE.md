@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.5.1-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.2-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -36,7 +36,9 @@ Klicke auf die **Effort**-Zeile (zweite Zeile des offiziellen Modellmenüs) stat
 
 ---
 
-> 🔧 **v0.5.1** — Kompatibel mit DSH **0.2.1-rc.2**: volatile Einstellungen, Revisionsprüfung, `RemoteResult`, Modellnamen und Menüfokus. Paketname und Client-Registrierung stimmen überein. `pnpm test:live` prüft die echte DSH-Anwendung im Browser.
+> 🔧 **v0.5.2** — DSH **0.2.1-rc.4 / rc.5**. Behebt das veraltete npm-0.5.1-Artefakt mit doppelter Factory-Registrierung: `prepack` baut neu und prüft die tatsächliche Client-ID. Mausziehen bleibt bei Katalogaktualisierungen aktiv; Schreibzugriffe laufen nacheinander und behalten nur den neuesten wartenden Wert.
+>
+> 🔧 **v0.5.1** — Kompatibel mit DSH **0.2.1-rc.2**: volatile Einstellungen, Revisionsprüfung, `RemoteResult`, Modellnamen und Menüfokus. `pnpm test:live` prüft die echte DSH-Anwendung im Browser.
 >
 > 🆕 **v0.5.0** — Evaluierungs-Fix-Batch. Zuverlässigkeit: das Panel unterscheidet jetzt „Lädt / Laden fehlgeschlagen / nicht unterstützt“ mit Retry-Button; fehlgeschlagene Slider-Schreibvorgänge zeigen kurz einen roten Status statt still zu scheitern; gleichzeitige Bearbeitungen der Nutzerkonfiguration werden erkannt (der Entry wird vor `mutate` neu gelesen, kollidierende Runden weichen aus); jeder Fehlerpfad der Host-Bereitstellung protokolliert jetzt eine Warnung, und eine nie erkannte Effort-Zeile erzeugt eine einmalige Diagnose. Panel-UX: verankert sich bei Scroll/Resize neu, schließt bei Esc / Klick außerhalb / Unmount des Ankers, ein erneuter Klick auf die Effort-Zeile schaltet sie um; Skalenpunkte und Labels liegen an den echten Einrastpunkten; der Slider trägt `aria-label` / `aria-valuetext`; die UI-Texte sind zweisprachig (zh/en, folgt `<html lang>`). Neue Option `debugReport`: Bereitstellungsdetails pro Route/Modell plus ein optionaler nur-lesender `llm/stream`-Tracer, der pro Anfrage Route/Modell/Effort protokolliert; ein `?`-Hinweis im Panel-Header zeigt auf `enabled` / Dialekt / `debugReport`. Außerdem: GitHub-Actions-CI (Typecheck + Tests + Build + Frischheits-Gate), die WebGL-Flamme brennt nicht mehr mit 60 fps, solange sie unsichtbar ist, und das npm-Paket heißt jetzt `@txc2768651338/dsh-effort-slider` (der alte Name ohne Scope, `dsh-effort-slider`, wurde eingestellt).
 >
@@ -102,7 +104,7 @@ Dialekt hat dort also keine Draht-Wirkung:
 
 | Punkt | Wert |
 | --- | --- |
-| DSH-Version | **0.2.1-rc.2** (der npm-`latest`-Dist-Tag; die Version, gegen die dieser Build verifiziert ist), Web-Profil unter Windows |
+| DSH-Version | **0.2.1-rc.4 / 0.2.1-rc.5**, Web-Profil unter Windows; Entwicklungstypen auf rc.5 festgelegt |
 | Kaputt auf | DSH ≤ 0.1.5 — v0.4.0 zielt auf den in 0.2.0 eingeführten `SettingsForms`-Settings-Dienst (für DSH 0.1.5 v0.3.0 verwenden; v0.2.5 und früher importieren zusätzlich `@deepseek-ai/dsh-client-runtime`, das nach 0.1.1-rc.2 entfernt wurde) |
 | Installationsmechanismus | `dsh plugin --profile web add` (Bundle-Patch + doppelte Hälfte) |
 | Abhängigkeiten | `ctx.sessions` (`@deepseek-ai/dsh-api-session-controller`) und `ctx.modelDirectories` (`@deepseek-ai/dsh-client-ui-model-selection`); Host: `ctx.llm`, `ctx.settings` (`SettingsForms`) |
@@ -215,7 +217,7 @@ test/                      host.spec.mjs Unit-Tests + host-apply.spec.mjs + clie
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js (Host-Hälfte) + lib/client.js (Browser-Hälfte)
-pnpm typecheck   # tsc --noEmit (grün gegen @deepseek-ai/* 0.2.1-rc.2)
+pnpm typecheck   # tsc --noEmit (@deepseek-ai/* 0.2.1-rc.5)
 pnpm test        # Paketname, reproduzierbarer Build und reine Provisioning-Logik
 pnpm test:live   # Echte DSH-Anwendung und Browser (Chromium installieren; Windows nutzt Edge)
 ```
@@ -227,7 +229,7 @@ pnpm test:live   # Echte DSH-Anwendung und Browser (Chromium installieren; Windo
 | `host.spec.mjs` | Reine Logik: Dialekt → Wire-Mapping, Provisioning-Patch-Erzeugung, Idempotenz |
 | `package-config.spec.mjs` | Paketidentität aus dem echten YAML-Bundle prüfen |
 | `build-determinism.mjs` | Artefakte aus zwei Verzeichnissen byteweise vergleichen |
-| `live-profile.spec.mjs` | DSH 0.2.1-rc.2 installieren und die echte Oberfläche, Speicherung und Live-Updates prüfen |
+| `live-profile.spec.mjs` | DSH rc.4 / rc.5 mit dem npm-Paket installieren; echte Maus-/Tastatureingaben, Speicherung und Live-Updates prüfen |
 
 CI führt beide Befehle aus. Laufzeit, Profil und Screenshots liegen unter `output/`; es werden keine Modellanfragen gesendet. Historische Fixture-Tests gehören nicht zur Release-Prüfung.
 

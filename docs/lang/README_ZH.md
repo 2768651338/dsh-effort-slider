@@ -15,7 +15,7 @@
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](../../LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4C9AFF.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![version](https://img.shields.io/badge/version-v0.5.1-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
+[![version](https://img.shields.io/badge/version-v0.5.2-success.svg)](https://github.com/2768651338/dsh-effort-slider/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-7B68EE.svg)](https://github.com/topics/dsh-plugin)
@@ -40,7 +40,9 @@
 
 ---
 
-> 🔧 **v0.5.1** — 适配 DSH **0.2.1-rc.2**：配置改为 volatile 字段；供给写入携带修订号；正确处理 `RemoteResult` 失败；修复档位着色、菜单焦点和旧会话面板。统一 bundle patch 与客户端的带 scope 包名，修复启动失败；热更新时通过 DSH 设置队列在当前 HMR 事务之后写入。保留跨目录构建一致性修复，并新增完整 DSH 程序的真实浏览器验收。
+> 🔧 **v0.5.2** — 开发依赖升级至 DSH **0.2.1-rc.5**，发布包在 **rc.4 / rc.5** 上验收。修复 npm 0.5.1 携带旧客户端产物、仍以 `dsh-effort-slider` 注册，导致重复工厂注册和桌面启动重载循环的问题。打包时强制重新构建，并解析实际 JavaScript 核对工厂 ID 与带 scope 的包名，阻止旧产物再次发布。修复实时档位写入触发目录刷新、中途禁用滑块而打断鼠标拖动的问题；写入串行执行，仅保留最新待写档位，并在提交前再次核对当前模型。
+>
+> 🔧 **v0.5.1** — 适配 DSH **0.2.1-rc.2**：配置改为 volatile 字段；供给写入携带修订号；正确处理 `RemoteResult` 失败；修复档位着色、菜单焦点和旧会话面板。源码构建配置已使用带 scope 的包名，npm 旧产物在 v0.5.2 修正；热更新时通过 DSH 设置队列在当前 HMR 事务之后写入。保留跨目录构建一致性修复，并新增完整 DSH 程序的真实浏览器验收。
 >
 > 🆕 **v0.5.0** — 评估修复批次。可靠性：面板将「加载中 / 加载失败 / 不支持」拆分为三分支状态并附重试按钮；滑杆写入失败时 header 状态短暂变红而非静默；供给途中检测用户并发编辑（`mutate` 前重读条目，冲突轮让路）；宿主供给全部失败路径均落告警，Effort 行从未被识别时输出一次性诊断。面板交互：跟随滚动/窗口变化重新定位，Esc / 点击外部 / 锚点卸载时关闭，再次点击 Effort 行可收起；刻度点与标签对齐真实吸附位置；滑杆带 `aria-label` / `aria-valuetext`；UI 文案双语（zh/en，跟随 `<html lang>`）。新增 `debugReport` 选项：逐路由逐模型供给明细，并可选只读 `llm/stream` 追踪逐请求记录 route/model/effort；面板 header 的「?」提示指向 `enabled` / 方言 / `debugReport` 排查链路。另外：新增 GitHub Actions CI（typecheck + 测试 + 构建 + 产物新鲜度门禁）；面板开着但不可见时 WebGL 火焰不再 60fps 空烧；npm 包更名为 `@txc2768651338/dsh-effort-slider`（旧无 scope 名 `dsh-effort-slider` 弃用）。
 >
@@ -113,7 +115,7 @@
 
 | 项目 | 值 |
 | --- | --- |
-| DSH 版本 | **0.2.1-rc.2**（npm `latest` dist-tag，本构建即针对该版本验证）；web profile，Windows |
+| DSH 版本 | **0.2.1-rc.4 / 0.2.1-rc.5**；开发类型固定 rc.5，Windows 真实 web profile |
 | 不再支持 | DSH ≤ 0.1.5 —— v0.4.0 面向 0.2.0 引入的 `SettingsForms` settings 服务（DSH 0.1.5 请使用 v0.3.0；v0.2.5 及更早还导入了 `@deepseek-ai/dsh-client-runtime`，该包在 0.1.1-rc.2 之后已被移除） |
 | 安装机制 | `dsh plugin --profile web add`（bundle patch + 双半区） |
 | 依赖 | `ctx.sessions`（`@deepseek-ai/dsh-api-session-controller`）与 `ctx.modelDirectories`（`@deepseek-ai/dsh-client-ui-model-selection`）；宿主：`ctx.llm`、`ctx.settings`（`SettingsForms`） |
@@ -195,10 +197,12 @@ effort-slider:
 
 | 现象 | 解决 |
 | --- | --- |
+| `duplicate factory registration for "dsh-effort-slider"`，随后 `web boot: 1 entry did not activate` | npm 0.5.1 带了仍注册无 scope 名称的旧客户端产物。将重新构建的 v0.5.2 安装到出错的 profile 后重启 DSH；反复刷新无法修复磁盘上的产物。无 scope 的 npm 包 `dsh-effort-slider` 由其他维护者维护，本项目工厂 ID 必须是 `@txc2768651338/dsh-effort-slider` |
 | 模型菜单没有「推理等级」行 | 该模型未声明 reasoning 元数据且宿主供给未生效 — 确认重启过 DSH，并在插件的设置页（其 profile entry 配置）检查 `enabled`；将 `debugReport` 设为 `true` 后到宿主日志查看逐模型供给明细 |
 | 面板显示「当前模型不支持思考强度调节」 | 通用兜底未启用 — 升级到 v0.2.0+ 并重启 |
 | 插件根本没加载（行被标了 `disabled: true`） | 旧构建曾在 `~/.dsh/profiles/web/cordis.patch.yml` 里被关掉；删掉该行再重启 |
 | 拖动后档位不生效 | 检查目标端点的线方言是否匹配（见上方方言表 —— 方言只在 `api: openai-completions` 路由上翻译），或为该路由显式设置 `defaultDialect`。将 `debugReport` 设为 `true` 后，宿主日志覆盖整条可验证链路：逐模型明细精确写出写了什么（或因何跳过）并标注方言不生效的路由；`[debug] request route=… model=… effort=…` 行证明每次调用携带的档位。剩下只有 pi-ai 内部的线上翻译是插件观测不到的。面板的 `?` 按钮复述了这份排查清单 |
+| 安装后仍出现另一个滑块 | 由其他维护者维护的无 scope 包 `dsh-effort-slider` 也使用 `ui-effort-slider` 条目和同一 CSS 标签。请在 DSH 插件管理中停用该竞争 bundle，保留 `@txc2768651338/dsh-effort-slider` 启用，然后完整重启 DSH；其安装文件可以保留。同机安装不代表两套滑块可以同时控制同一菜单 |
 | 与其它皮肤插件冲突 | 若同时安装了会拦截「推理等级」行的皮肤（如 dsh-ui-web 系列的 aurora），需将其拦截段禁用，避免双面板 |
 | 重启后版本仍显示旧版 | `file:` 安装是快照拷贝 — 用 `github:` 安装或重跑 add 后再重启 |
 | 日志在哪 | 宿主错误看 DSH 启动日志（`debugReport: true` 时供给明细与逐请求档位追踪以 `effort-slider: [debug]` 行输出）；客户端错误看浏览器 DevTools（F12）Console（`[effort-slider]` 前缀） |
@@ -229,24 +233,25 @@ test/                      host.spec.mjs 宿主单测 + host-apply.spec.mjs + cl
 ```sh
 pnpm install
 pnpm build       # tsdown → lib/index.js（宿主半区）+ lib/client.js（浏览器半区）
-pnpm typecheck   # tsc --noEmit（对 @deepseek-ai/* 0.2.1-rc.2 全绿）
+pnpm typecheck   # tsc --noEmit，对 @deepseek-ai/* 0.2.1-rc.5 校验
 pnpm test        # 包名一致性、跨目录构建一致性、供给纯逻辑
 pnpm exec playwright install chromium # 未安装 Chromium 时执行一次；Windows 默认使用 Edge
-pnpm test:live   # 启动官方 DSH 程序、安装本插件，并操作真实浏览器界面
+pnpm test:live   # 在真实 DSH 0.2.1-rc.5 安装 npm 打包产物并操作界面
+# 设置 DSH_TEST_VERSION=0.2.1-rc.4 可验收日志中的桌面运行时版本。
 ```
 
 `test/` 验证层次：
 
 | 文件 | 覆盖范围 |
 | --- | --- |
-| `package-config.spec.mjs` | 使用 YAML 库读取实际 bundle patch，核对分发包名 |
-| `build-determinism.mjs` | 在两个项目内目录构建原样源码，逐字节对比三份产物 |
+| `package-config.spec.mjs` | 使用 YAML / TypeScript 解析 bundle 和实际 JavaScript，核对唯一工厂、带 scope 的分发包名与 prepack 构建校验 |
+| `build-determinism.mjs` | 在两个测试工作目录构建原样源码，逐字节对比三份产物 |
 | `host.spec.mjs` | 纯逻辑：方言 → 线级映射、供给补丁生成、幂等 |
-| `live-profile.spec.mjs` | 启动官方 DSH 0.2.1-rc.2、通过 CLI 安装本插件，在 Edge/Chromium 中验证带 scope 的客户端启动、设置落盘、键盘与焦点、刷新恢复、窄屏布局和即时方言更新 |
+| `live-profile.spec.mjs` | 启动官方 DSH rc.4 / rc.5、通过 CLI 安装实际 npm 打包产物，在 Edge/Chromium 中验证带 scope 的客户端启动、鼠标/键盘 OFF/MAX 落盘、外部点击/Esc 关闭、刷新恢复、窄屏布局和即时方言更新；设置 `DSH_TEST_COINSTALL=1` 可同时安装另一个无 scope 的滑块包 |
 
-CI 同时运行两条测试命令。真实验收使用被忽略的 `output/` 保存独立运行时、profile、截图和报告，覆盖配置、模型目录和会话选择，不发送模型生成请求；历史替身测试不纳入发布验证。
+CI 在 rc.4 / rc.5 上运行两条测试命令。Windows 测试运行时、独立 profile、截图和报告保存在 `E:\Codex\Workspace\dsh-effort-slider-20261101`，进程临时目录为 `E:\Codex\Temp`；其它平台使用被忽略的 `output/`。可通过 `DSH_TEST_WORKSPACE` 指定测试工作目录。真实验收覆盖配置、模型目录和会话选择，不发送模型生成请求；历史替身测试不纳入发布验证。`npm pack` 和发布都会执行 `prepack`，重新构建并校验实际产物。
 
-热更新桥接会检测 DSH 0.2.1 内部的 HMR 事务上下文，在排队前退出该异步上下文；实际写入仍使用带修订号校验的公开设置 API 及其独占队列。真实测试固定 DSH 0.2.1-rc.2，升级支持版本时需一并验证这项内部契约。
+热更新桥接会检测 DSH 0.2.1 内部的 HMR 事务上下文，在排队前退出该异步上下文；实际写入仍使用带修订号校验的公开设置 API 及其独占队列。真实测试默认 rc.5，CI 同时固定 rc.4，升级支持版本时一并验证这项内部契约。
 
 **贡献.** Fork → 修改 → `pnpm build` → 跑 `pnpm test` → 向 `main` 开 PR。小修复（文档、测试）无需事先讨论；报告问题时附 DSH 版本与具体报错。
 
